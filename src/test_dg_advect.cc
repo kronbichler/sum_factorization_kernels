@@ -16,7 +16,7 @@
 #endif
 
 const unsigned int min_degree = 1;
-const unsigned int max_degree = 7;
+const unsigned int max_degree = 14;
 const unsigned int dimension = 3;
 typedef double value_type;
 
