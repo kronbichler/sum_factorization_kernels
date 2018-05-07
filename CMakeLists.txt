@@ -36,6 +36,9 @@ target_link_libraries(test_dg_precomputed ${MPI_LIBRARIES})
 add_executable(test_dg_integrate src/test_dg_integrate.cc)
 target_link_libraries(test_dg_integrate ${MPI_LIBRARIES})
 
+add_executable(test_dg_advect src/test_dg_advect.cc)
+target_link_libraries(test_dg_advect ${MPI_LIBRARIES})
+
 add_executable(test_program_vect src/test_program_vect.cc)
 target_link_libraries(test_program_vect ${MPI_LIBRARIES})
 
@@ -63,6 +66,11 @@ if (LIKWID_FOUND)
   target_link_libraries(test_dg_integrate_likwid ${MPI_LIBRARIES})
   target_link_libraries(test_dg_integrate_likwid ${LIKWID_LIBRARIES})
   target_compile_definitions(test_dg_integrate_likwid PRIVATE LIKWID_PERFMON)
+
+  add_executable(test_dg_advect_likwid src/test_dg_advect.cc)
+  target_link_libraries(test_dg_advect_likwid ${MPI_LIBRARIES})
+  target_link_libraries(test_dg_advect_likwid ${LIKWID_LIBRARIES})
+  target_compile_definitions(test_dg_advect_likwid PRIVATE LIKWID_PERFMON)
 
   add_executable(test_program_vect_likwid src/test_program_vect.cc)
   target_link_libraries(test_program_vect_likwid ${MPI_LIBRARIES})

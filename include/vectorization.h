@@ -134,6 +134,13 @@ public:
     base_ptr[offsets[0]] = data;
   }
 
+  VectorizedArray get_abs () const
+  {
+    VectorizedArray res;
+    res.data = std::abs(data);
+    return res;
+  }
+
   Number data;
 };
 
@@ -307,6 +314,17 @@ public:
     const __m256 index_val = _mm256_loadu_ps((const float *)offsets);
     const __m256i index = *((__m256i *)(&index_val));
     _mm512_i32scatter_pd(base_ptr, index, data, 8);
+  }
+
+  VectorizedArray get_abs () const
+  {
+    // to compute the absolute value, perform bitwise andnot with -0. This
+    // will leave all value and exponent bits unchanged but force the sign
+    // value to +
+    __m512d mask = _mm512_set1_pd (-0.);
+    VectorizedArray res;
+    res.data = (__m512d)_mm512_andnot_epi64 ((__m512i)mask, (__m512i)data);
+    return res;
   }
 
   __m512d data;
@@ -548,6 +566,14 @@ public:
     const __m512 index_val = _mm512_loadu_ps((const float *)offsets);
     const __m512i index = *((__m512i *)(&index_val));
     _mm512_i32scatter_ps(base_ptr, index, data, 4);
+  }
+
+  VectorizedArray get_abs () const
+  {
+    __m512 mask = _mm512_set1_ps (-0.f);
+    VectorizedArray res;
+    res.data = (__m512)_mm512_andnot_epi32 ((__m512i)mask, (__m512i)data);
+    return res;
   }
 
   __m512 data;
@@ -820,6 +846,14 @@ public:
       base_ptr[offsets[i]] = *(reinterpret_cast<const double *>(&data)+i);
   }
 
+  VectorizedArray get_abs () const
+  {
+    __m256d mask = _mm256_set1_pd (-0.);
+    VectorizedArray res;
+    res.data = _mm256_andnot_pd(mask, data);
+    return res;
+  }
+
   __m256d data;
 };
 
@@ -1051,6 +1085,14 @@ public:
     // no scatter operation in AVX/AVX2
     for (unsigned int i=0; i<8; ++i)
       base_ptr[offsets[i]] = *(reinterpret_cast<const float *>(&data)+i);
+  }
+
+  VectorizedArray get_abs () const
+  {
+    __m256 mask = _mm256_set1_ps (-0.f);
+    VectorizedArray res;
+    res.data = _mm256_andnot_ps(mask, data);
+    return res;
   }
 
   __m256 data;
@@ -1310,6 +1352,14 @@ public:
       base_ptr[offsets[i]] = *(reinterpret_cast<const double *>(&data)+i);
   }
 
+  VectorizedArray get_abs () const
+  {
+    __m128d mask = _mm_set1_pd (-0.);
+    VectorizedArray res;
+    res.data = _mm_andnot_pd(mask, data);
+    return res;
+  }
+
   __m128d data;
 };
 
@@ -1438,6 +1488,14 @@ public:
   {
     for (unsigned int i=0; i<4; ++i)
       base_ptr[offsets[i]] = *(reinterpret_cast<const float *>(&data)+i);
+  }
+
+  VectorizedArray get_abs () const
+  {
+    __m128 mask = _mm_set1_ps (-0.f);
+    VectorizedArray res;
+    res.data = _mm_andnot_ps(mask, data);
+    return res;
   }
 
   __m128 data;
@@ -1643,5 +1701,16 @@ operator - (const VectorizedArray<Number> &u)
   return VectorizedArray<Number>()-u;
 }
 
+
+namespace std
+{
+  template <typename Number>
+  inline
+  VectorizedArray<Number>
+  abs (const VectorizedArray<Number> &x)
+  {
+    return x.get_abs();
+  }
+}
 
 #endif
