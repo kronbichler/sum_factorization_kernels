@@ -9,8 +9,8 @@
 //
 // Author: Martin Kronbichler, April 2018
 
-#ifndef precomputed_cell_laplacian_h
-#define precomputed_cell_laplacian_h
+#ifndef precomputed_dg_laplacian_h
+#define precomputed_dg_laplacian_h
 
 #include <mpi.h>
 

@@ -33,20 +33,31 @@ void run_program(const unsigned int vector_size_guess,
   PrecomputedDGLaplacian<dim,degree,Number> evaluator;
   const unsigned int n_cells_tot = std::max(vector_size_guess / Utilities::pow(degree+1,dim),
                                             1U);
-  unsigned int n_cells[dim];
+  unsigned int n_cells[3];
   n_cells[0] = std::max(static_cast<unsigned int>(1.00001*std::pow((double)n_cells_tot, 1./dim))
                         /VectorizedArray<Number>::n_array_elements,
                         1U)*VectorizedArray<Number>::n_array_elements;
   if (dim > 2)
     {
       n_cells[1] = n_cells[0];
-      n_cells[2] = n_cells_tot/(n_cells[0]*n_cells[1]);
+      n_cells[2] = std::max(n_cells_tot/(n_cells[0]*n_cells[1]), 1U);
     }
   else
-    n_cells[1] = std::max(n_cells_tot/n_cells[0], 1U);
-  evaluator.blx = 3;//2048 / evaluator.dofs_per_cell;
-  evaluator.bly = 9;
-  evaluator.blz = 6;
+    {
+      n_cells[1] = std::max(n_cells_tot/n_cells[0], 1U);
+      n_cells[2] = 1;
+    }
+
+  evaluator.blx = std::max(20/(degree+1), 3);
+  evaluator.bly = std::max(2, 20/(degree+1));
+  evaluator.blz = std::max(2, 20/(degree+1));
+
+  // fit cells to multiple of block size
+  if (dim == 3)
+    n_cells[2] = std::max(1U, n_cells[2] / evaluator.blz) * evaluator.blz;
+  n_cells[1] = std::max(1U, n_cells[1] / evaluator.bly) * evaluator.bly;
+  n_cells[0] = std::max(n_cells_tot/(n_cells[1] * n_cells[2])/VectorizedArray<Number>::n_array_elements, 1U) * VectorizedArray<Number>::n_array_elements;
+
   evaluator.initialize(n_cells);
 
   std::size_t local_size = evaluator.n_elements()*evaluator.dofs_per_cell;

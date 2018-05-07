@@ -8,8 +8,8 @@
 //
 // Author: Martin Kronbichler, April 2018
 
-#ifndef evaluation_cell_laplacian_h
-#define evaluation_cell_laplacian_h
+#ifndef evaluation_dg_laplacian_h
+#define evaluation_dg_laplacian_h
 
 #include <mpi.h>
 
@@ -263,7 +263,7 @@ public:
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
                 apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
                   (shape_values_eo, array_f[f]+i1*nn, array_f[f]+i1*nn);
-              for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
+              for (unsigned int i1=0; i1<(dim==3 ? nn : 0); ++i1)
                 apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
                   (shape_values_eo, array_f[f]+i1, array_f[f]+i1);
 
@@ -271,7 +271,7 @@ public:
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
                 apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
                   (shape_values_eo, array_fd[f]+i1*nn, array_fd[f]+i1*nn);
-              for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
+              for (unsigned int i1=0; i1<(dim==3 ? nn : 0); ++i1)
                 apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
                   (shape_values_eo, array_fd[f]+i1, array_fd[f]+i1);
             }
@@ -297,8 +297,8 @@ public:
                   for (unsigned int i2=0; i2<degree+1; ++i2)
                     {
                       const unsigned int i=i1*(degree+1)+i2;
-                      array_f[f][i].load(input_array.begin()+index[f]+(base_offset1+i2)*n_lanes);
-                      array_fd[f][i].load(input_array.begin()+index[f]+(base_offset2+i2)*n_lanes);
+                      array_f[f][i].load(input_array.begin()+index[f%2]+(base_offset1+i2)*n_lanes);
+                      array_fd[f][i].load(input_array.begin()+index[f%2]+(base_offset2+i2)*n_lanes);
                       array_fd[f][i] = w0 * (array_fd[f][i] - array_f[f][i]);
                     }
                 }
@@ -307,7 +307,7 @@ public:
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
                 apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
                   (shape_values_eo, array_f[f]+i1*nn, array_f[f]+i1*nn);
-              for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
+              for (unsigned int i1=0; i1<(dim==3 ? nn : 0); ++i1)
                 apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
                   (shape_values_eo, array_f[f]+i1, array_f[f]+i1);
 
@@ -315,7 +315,7 @@ public:
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
                 apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
                   (shape_values_eo, array_fd[f]+i1*nn, array_fd[f]+i1*nn);
-              for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
+              for (unsigned int i1=0; i1<(dim==3 ? nn : 0); ++i1)
                 apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
                   (shape_values_eo, array_fd[f]+i1, array_fd[f]+i1);
             }
