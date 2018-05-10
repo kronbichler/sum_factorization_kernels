@@ -52,10 +52,17 @@ public:
     n_blocks[1] = (n_cells[1] + bly - 1)/bly;
     n_blocks[0] = (n_cells[0] + blx - 1)/blx;
 
-    input_array.resize(0);
-    output_array.resize(0);
-    input_array.resize_fast(n_elements() * dofs_per_cell);
-    output_array.resize_fast(n_elements() * dofs_per_cell);
+    sol_old.resize(0);
+    sol_new.resize(0);
+    mat_diagonal.resize(0);
+    sol_tmp.resize(0);
+    sol_rhs.resize(0);
+
+    sol_old.resize_fast(n_elements() * dofs_per_cell);
+    sol_new.resize_fast(n_elements() * dofs_per_cell);
+    mat_diagonal.resize_fast(n_elements() * dofs_per_cell);
+    sol_tmp.resize_fast(n_elements() * dofs_per_cell);
+    sol_rhs.resize_fast(n_elements() * dofs_per_cell);
 
 #pragma omp parallel
     {
@@ -70,8 +77,11 @@ public:
                   for (std::size_t ix=dofs_per_cell*VectorizedArray<Number>::n_array_elements*(kb*blx+ii);
                        ix<(std::min(n_cells[0], (kb+1)*blx)+ii)*dofs_per_cell*VectorizedArray<Number>::n_array_elements; ++ix)
                     {
-                      input_array[ix] = 1;
-                      output_array[ix] = 0.;
+                      sol_old[ix] = 1;
+                      sol_new[ix] = 0.;
+                      mat_diagonal[ix] = 1.;
+                      sol_tmp[ix] = 0.;
+                      sol_rhs[ix] = 1;
                     }
                 }
     }
@@ -104,10 +114,28 @@ public:
     std::cout << "Verification currently not implemented!" << std::endl;
   }
 
+  void do_matvec()
+  {
+    do_cheby_iter<false>(sol_new, sol_new, sol_new, sol_tmp, sol_tmp, 0., 0.);
+  }
+
+  void do_chebyshev()
+  {
+    do_cheby_iter<true>(sol_rhs, sol_old, mat_diagonal, sol_new, sol_tmp, 0.5, 0.5);
+  }
+
+  template <bool evaluate_chebyshev=true>
   void do_inner_loop (const unsigned int start_x,
                       const unsigned int end_x,
                       const unsigned int iy,
-                      const unsigned int iz)
+                      const unsigned int iz,
+                      const AlignedVector<Number> &src,
+                      const AlignedVector<Number> &sol_old,
+                      const AlignedVector<Number> &mat_diagonal,
+                      AlignedVector<Number>       &sol_new,
+                      AlignedVector<Number>       &vec_tm,
+                      const Number                 coefficient_np,
+                      const Number                 coefficient_tm)
   {
     constexpr unsigned int nn = degree+1;
     constexpr unsigned int n_lanes = VectorizedArray<Number>::n_array_elements;
@@ -129,9 +157,9 @@ public:
       {
         const unsigned int ii=((iz*n_cells[1]+iy)*n_cells[0]+ix)*n_lanes;
         const VectorizedArray<Number>* src_array =
-          reinterpret_cast<const VectorizedArray<Number>*>(input_array.begin()+ii*dofs_per_cell);
+          reinterpret_cast<const VectorizedArray<Number>*>(sol_old.begin()+ii*dofs_per_cell);
         VectorizedArray<Number>* dst_array =
-          reinterpret_cast<VectorizedArray<Number>*>(output_array.begin()+ii*dofs_per_cell);
+          reinterpret_cast<VectorizedArray<Number>*>(sol_new.begin()+ii*dofs_per_cell);
 
         const VectorizedArray<Number> * inv_jac = jacobian_data.begin();
         const VectorizedArray<Number> my_jxw = jxw_data[0];
@@ -172,8 +200,8 @@ public:
                 const unsigned int offset2 = dofs_per_face * (f==4 ? degree-1 : 1);
                 for (unsigned int i=0; i<dofs_per_face; ++i)
                   {
-                    array_f[f][i].load(input_array.begin()+index[f%2]+(offset1+i)*n_lanes);
-                    array_fd[f][i].load(input_array.begin()+index[f%2]+(offset2+i)*n_lanes);
+                    array_f[f][i].load(sol_old.begin()+index[f%2]+(offset1+i)*n_lanes);
+                    array_fd[f][i].load(sol_old.begin()+index[f%2]+(offset2+i)*n_lanes);
                     array_fd[f][i] = w0 * (array_fd[f][i] - array_f[f][i]);
                   }
 
@@ -254,8 +282,8 @@ public:
               const unsigned int offset2 = (f==0 ? degree-1 : 1);
               for (unsigned int i=0; i<dofs_per_face; ++i)
                 {
-                  array_f[f][i].gather(input_array.begin()+(offset1+i*(degree+1))*n_lanes, indices+f*n_lanes);
-                  array_fd[f][i].gather(input_array.begin()+(offset2+i*(degree+1))*n_lanes, indices+f*n_lanes);
+                  array_f[f][i].gather(sol_old.begin()+(offset1+i*(degree+1))*n_lanes, indices+f*n_lanes);
+                  array_fd[f][i].gather(sol_old.begin()+(offset2+i*(degree+1))*n_lanes, indices+f*n_lanes);
                   array_fd[f][i] = w0 * (array_fd[f][i] - array_f[f][i]);
                 }
 
@@ -297,8 +325,8 @@ public:
                   for (unsigned int i2=0; i2<degree+1; ++i2)
                     {
                       const unsigned int i=i1*(degree+1)+i2;
-                      array_f[f][i].load(input_array.begin()+index[f%2]+(base_offset1+i2)*n_lanes);
-                      array_fd[f][i].load(input_array.begin()+index[f%2]+(base_offset2+i2)*n_lanes);
+                      array_f[f][i].load(sol_old.begin()+index[f%2]+(base_offset1+i2)*n_lanes);
+                      array_fd[f][i].load(sol_old.begin()+index[f%2]+(base_offset2+i2)*n_lanes);
                       array_fd[f][i] = w0 * (array_fd[f][i] - array_f[f][i]);
                     }
                 }
@@ -460,14 +488,46 @@ public:
             VectorizedArray<Number> *__restrict in = data_ptr + i2*nn*nn;
             for (unsigned int i1=0; i1<nn; ++i1)
               {
-                apply_1d_matvec_kernel<nn, 1, 0, true, false, Number, true>
-                  (shape_values_eo, data_ptr+offset+i1*nn, dst_array+offset+i1*nn);
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
+                  (shape_values_eo, data_ptr+offset+i1*nn, data_ptr+offset+i1*nn);
+
+                if (evaluate_chebyshev)
+                  {
+                    VectorizedArray<Number>* tmp_array =
+                      reinterpret_cast<VectorizedArray<Number>*>
+                      (vec_tm.begin()+ii*dofs_per_cell) + offset + i1*nn;
+                    const VectorizedArray<Number>* rhs_array =
+                      reinterpret_cast<const VectorizedArray<Number>*>
+                      (sol_rhs.begin()+ii*dofs_per_cell) + offset + i1*nn;
+                    const VectorizedArray<Number>* diag_array =
+                      reinterpret_cast<const VectorizedArray<Number>*>
+                      (mat_diagonal.begin()+ii*dofs_per_cell) + offset + i1*nn;
+                    for (unsigned int i=0; i<degree+1; ++i)
+                      {
+                        const VectorizedArray<Number> res = data_ptr[offset+i1*nn+i] - rhs_array[i];
+                        const VectorizedArray<Number> tmp = coefficient_tm * tmp_array[i] + coefficient_np * diag_array[i] * res;
+                        tmp_array[i] = tmp;
+                        (src_array[offset+i1*nn+i] - tmp).streaming_store(&dst_array[offset+i1*nn+i][0]);
+                      }
+                  }
+                else
+                  {
+                    for (unsigned int i=0; i<degree+1; ++i)
+                      data_ptr[offset+i1*nn+i].streaming_store(&dst_array[offset+i1*nn+i][0]);
+                  }
               }
           }
       }
   }
 
-  void matrix_vector_product()
+  template <bool evaluate_chebyshev=true>
+  void do_cheby_iter (const AlignedVector<Number> &src,
+                      const AlignedVector<Number> &sol_old,
+                      const AlignedVector<Number> &mat_diagonal,
+                      AlignedVector<Number>       &sol_new,
+                      AlignedVector<Number>       &vec_tm,
+                      const Number                 coefficient_np,
+                      const Number                 coefficient_tm)
   {
     if (degree < 1)
       return;
@@ -476,7 +536,8 @@ public:
     {
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_START(("dg_laplacian_" + std::to_string(dim) +
-                           "d_deg_" + std::to_string(degree)).c_str());
+                           "d_deg_" + std::to_string(degree) +
+                           (evaluate_chebyshev ? "ch" : "mv")).c_str());
 #endif
 
 #pragma omp for schedule (static) collapse(2)
@@ -485,11 +546,15 @@ public:
           for (unsigned int kb=0; kb<n_blocks[0]; ++kb)
             for (unsigned int i=ib*blz; i<std::min(n_cells[2], (ib+1)*blz); ++i)
               for (unsigned int j=jb*bly; j<std::min(n_cells[1], (jb+1)*bly); ++j)
-                do_inner_loop(kb*blx, std::min(n_cells[0], (kb+1)*blx), j, i);
+                do_inner_loop<evaluate_chebyshev>
+                  (kb*blx, std::min(n_cells[0], (kb+1)*blx), j, i,
+                   src, sol_old, mat_diagonal, sol_new, vec_tm,
+                   coefficient_np, coefficient_tm);
 
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_STOP(("dg_laplacian_" + std::to_string(dim) +
-                          "d_deg_" + std::to_string(degree)).c_str());
+                          "d_deg_" + std::to_string(degree) +
+                           (evaluate_chebyshev ? "ch" : "mv")).c_str());
 #endif
     }
   }
@@ -607,8 +672,11 @@ private:
 
   Number value_outer_1, value_outer_2;
 
-  AlignedVector<Number> input_array;
-  AlignedVector<Number> output_array;
+  AlignedVector<Number> sol_old;
+  AlignedVector<Number> sol_new;
+  AlignedVector<Number> sol_rhs;
+  AlignedVector<Number> sol_tmp;
+  AlignedVector<Number> mat_diagonal;
 
   AlignedVector<VectorizedArray<Number> > jxw_data;
   AlignedVector<VectorizedArray<Number> > jacobian_data;

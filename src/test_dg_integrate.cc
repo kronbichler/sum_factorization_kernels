@@ -93,7 +93,7 @@ void run_program(const unsigned int vector_size_guess,
       double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
 
       for (unsigned int t=0; t<n_tests; ++t)
-        evaluator.matrix_vector_product();
+        evaluator.do_matvec();
 
       gettimeofday(&wall_timer, NULL);
       const double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
@@ -126,7 +126,7 @@ void run_program(const unsigned int vector_size_guess,
            + 2*dim * 4 * ops_interpolate * Utilities::pow(degree+1,dim-2)
            + 2*dim * 2 * (degree+1 + 2*(degree+1) + 4) * Utilities::pow(degree+1,dim-1) +
            + 2*dim * 12) * n_tests;
-      std::cout << "Degree " << std::setw(2) << degree << "  ";
+      std::cout << "MV degree " << std::setw(2) << degree << "  ";
       for (unsigned int d=0; d<dim; ++d)
         std::cout << n_cells[d] << (d<dim-1 ? " x " : "");
       std::cout << " elem " << evaluator.dofs_per_cell << ", block sizes: "
@@ -140,6 +140,58 @@ void run_program(const unsigned int vector_size_guess,
                  << (double)ops_approx/best_avg*1e-9
                  << std::endl;
     }
+
+  best_avg = std::numeric_limits<double>::max();
+
+  for (unsigned int i=0; i<5; ++i)
+    {
+      MPI_Barrier(MPI_COMM_WORLD);
+
+      struct timeval wall_timer;
+      gettimeofday(&wall_timer, NULL);
+      double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
+
+      for (unsigned int t=0; t<n_tests; ++t)
+        evaluator.do_chebyshev();
+
+      gettimeofday(&wall_timer, NULL);
+      const double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+
+      double min_time = -1, max_time = -1, avg_time = -1;
+      MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+      MPI_Allreduce(&compute_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+      MPI_Allreduce(&compute_time, &avg_time, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+      best_avg = std::min(best_avg, avg_time/n_procs);
+    }
+  if (rank == 0)
+    {
+      const std::size_t mem_transfer = global_size * sizeof(Number) *
+        6 * n_tests;
+      const std::size_t ops_interpolate = (/*add*/2*((degree+1)/2)*2 +
+                                           /*mult*/degree+1 +
+                                           /*fma*/2*((degree-1)*(degree+1)/2));
+      const std::size_t ops_approx = global_size / evaluator.dofs_per_cell
+        * (4 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
+           + 2 * dim * 2 * Utilities::pow(degree+1,dim-1)
+           + 2*dim * 4 * ops_interpolate * Utilities::pow(degree+1,dim-2)
+           + 2*dim * 2 * (degree+1 + 2*(degree+1) + 4) * Utilities::pow(degree+1,dim-1) +
+           + 2*dim*12 + (2*dim+5) * Utilities::pow(degree+1,dim)) * n_tests;
+      std::cout << "CH degree " << std::setw(2) << degree << "  ";
+      for (unsigned int d=0; d<dim; ++d)
+        std::cout << n_cells[d] << (d<dim-1 ? " x " : "");
+      std::cout << " elem " << evaluator.dofs_per_cell << ", block sizes: "
+                << evaluator.blx*VectorizedArray<Number>::n_array_elements
+                << " x " << evaluator.bly;
+      if (dim==3)
+        std::cout << " x " << evaluator.blz;
+      std::cout  << ", MDoFs/s: "
+                 << global_size * n_tests / best_avg/1e6 << ", GB/s: "
+                 << (double)mem_transfer/best_avg*1e-9 << " GFLOP/s: "
+                 << (double)ops_approx/best_avg*1e-9
+                 << std::endl;
+    }
+
 #ifdef DO_BLOCK_SIZE_TEST
       }
 #endif
