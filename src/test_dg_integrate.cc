@@ -96,7 +96,7 @@ void run_program(const unsigned int vector_size_guess,
         evaluator.do_matvec();
 
       gettimeofday(&wall_timer, NULL);
-      const double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+      double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
 
       double min_time = -1, max_time = -1, avg_time = -1;
       MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
@@ -155,7 +155,7 @@ void run_program(const unsigned int vector_size_guess,
         evaluator.do_chebyshev();
 
       gettimeofday(&wall_timer, NULL);
-      const double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+      double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
 
       double min_time = -1, max_time = -1, avg_time = -1;
       MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
@@ -230,6 +230,8 @@ int main(int argc, char** argv)
   const unsigned int nthreads = 1;
 #endif
   std::cout << "Number of threads: " << nthreads << std::endl;
+  std::cout << "SIMD width:        "
+            << sizeof(VectorizedArray<value_type>)/sizeof(value_type) << std::endl;
   std::size_t  vector_size_guess = 10000000;
   unsigned int n_tests           = 100;
   if (argc > 1)

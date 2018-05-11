@@ -25,6 +25,7 @@
 #define vectorization_h
 
 #include <x86intrin.h>
+#include <cstdlib>
 
 #ifndef USE_VECTOR_ARITHMETICS
 #define USE_VECTOR_ARITHMETICS 1

@@ -564,10 +564,10 @@ public:
             // cell integral on quadrature points
             for (unsigned int q=0; q<dofs_per_plane; ++q)
               {
-                array_0[q] = advection.data[0] * inv_jac[0][0]*(my_jxw*quadrature_ptr[q] * array_ptr[q]);
-                array_1[q] = advection.data[1] * inv_jac[1][1]*(my_jxw*quadrature_ptr[q] * array_ptr[q]);
+                array_0[q] = advection.data[0] * inv_jac[0]*(my_jxw*quadrature_ptr[q] * array_ptr[q]);
+                array_1[q] = advection.data[1] * inv_jac[1]*(my_jxw*quadrature_ptr[q] * array_ptr[q]);
                 if (dim>2)
-                  array_2_ptr[q] = advection.data[2] * inv_jac[2][2]*(my_jxw*quadrature_ptr[q] * array_ptr[q]);
+                  array_2_ptr[q] = advection.data[2] * inv_jac[2]*(my_jxw*quadrature_ptr[q] * array_ptr[q]);
               }
             for (unsigned int i=0; i<degree+1; ++i)
               {

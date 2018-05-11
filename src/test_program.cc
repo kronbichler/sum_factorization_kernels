@@ -65,7 +65,7 @@ void run_program()
         evaluator.matrix_vector_product();
 
       gettimeofday(&wall_timer, NULL);
-      const double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+      double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
 
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_STOP(("cell_laplacian_deg_" + std::to_string(degree)).c_str());
