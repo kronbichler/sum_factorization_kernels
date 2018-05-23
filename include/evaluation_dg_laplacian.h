@@ -34,8 +34,8 @@ class EvaluationDGLaplacian
 {
 public:
   static constexpr unsigned int dimension = dim;
-  static constexpr unsigned int n_q_points = pow(degree+1,dim);
-  static constexpr unsigned int dofs_per_cell = pow(degree+1,dim);
+  static constexpr unsigned int n_q_points = Utilities::pow(degree+1,dim);
+  static constexpr unsigned int dofs_per_cell = Utilities::pow(degree+1,dim);
   unsigned int blx;
   unsigned int bly;
   unsigned int blz;
@@ -575,8 +575,8 @@ private:
 
   void fill_shape_values()
   {
-    const unsigned int n_q_points_1d = degree+1;
-    const unsigned int stride = (n_q_points_1d+1)/2;
+    constexpr unsigned int n_q_points_1d = degree+1;
+    constexpr unsigned int stride = (n_q_points_1d+1)/2;
     shape_values_eo.resize((degree+1)*stride);
     shape_gradients_eo.resize((degree+1)*stride);
 

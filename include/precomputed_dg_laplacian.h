@@ -35,8 +35,8 @@ class PrecomputedDGLaplacian
 {
 public:
   static constexpr unsigned int dimension = dim;
-  static constexpr unsigned int n_q_points = pow(degree+1,dim);
-  static constexpr unsigned int dofs_per_cell = pow(degree+1,dim);
+  static constexpr unsigned int n_q_points = Utilities::pow(degree+1,dim);
+  static constexpr unsigned int dofs_per_cell = Utilities::pow(degree+1,dim);
   unsigned int blx;
   unsigned int bly;
   unsigned int blz;
