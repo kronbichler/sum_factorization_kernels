@@ -30,6 +30,9 @@ message("${MPI_LIBRARIES}")
 add_executable(test_program src/test_program.cc)
 target_link_libraries(test_program ${MPI_LIBRARIES})
 
+add_executable(benchmark_loops src/benchmark_loops.cc)
+target_link_libraries(benchmark_loops ${MPI_LIBRARIES})
+
 add_executable(test_dg_precomputed src/test_dg_precomputed.cc)
 target_link_libraries(test_dg_precomputed ${MPI_LIBRARIES})
 
@@ -56,6 +59,12 @@ if (LIKWID_FOUND)
   target_link_libraries(test_program_likwid ${MPI_LIBRARIES})
   target_link_libraries(test_program_likwid ${LIKWID_LIBRARIES})
   target_compile_definitions(test_program_likwid PRIVATE LIKWID_PERFMON)
+
+
+  add_executable(benchmark_loops_likwid src/benchmark_loops.cc)
+  target_link_libraries(benchmark_loops_likwid ${MPI_LIBRARIES})
+  target_link_libraries(benchmark_loops_likwid ${LIKWID_LIBRARIES})
+  target_compile_definitions(benchmark_loops_likwid PRIVATE LIKWID_PERFMON)
 
   add_executable(test_dg_precomputed_likwid src/test_dg_precomputed.cc)
   target_link_libraries(test_dg_precomputed_likwid ${MPI_LIBRARIES})
