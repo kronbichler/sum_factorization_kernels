@@ -1528,9 +1528,9 @@ double run_kernel(const unsigned int n_tests)
           {
             for (unsigned int t=0; t<n_tests; ++t)
               {
-                auto t1 = std::chrono::high_resolution_clock::now();
+                auto t1 = std::chrono::system_clock::now();
                 evaluator.template matrix_vector_product<kernel>();
-                double time = std::chrono::duration<double>(std::chrono::high_resolution_clock::now()-t1).count();
+                double time = std::chrono::duration<double>(std::chrono::system_clock::now()-t1).count();
                 tmin = std::min(tmin, time);
                 tmax = std::max(tmax, time);
                 variance = (t > 0 ? (double)(t-1)/(t)*variance : 0) + (time - tavg) * (time - tavg) / (t+1);

@@ -559,6 +559,47 @@ public:
     }
   }
 
+  void emulate_cheby_vector_updates()
+  {
+    const Number* ptr_old = sol_old.begin();
+    Number* ptr_new = sol_new.begin();
+    const Number* ptr_diag = mat_diagonal.begin();
+    Number* ptr_tmp = sol_tmp.begin();
+    const Number* ptr_rhs = sol_rhs.begin();
+    const Number coeff1 = 0.6;
+    const Number coeff2 = 0.45;
+
+#pragma omp parallel
+    {
+#ifdef LIKWID_PERFMON
+    LIKWID_MARKER_START(("dg_laplacian_" + std::to_string(dim) +
+                         "d_deg_" + std::to_string(degree) + "vu").c_str());
+#endif
+
+#pragma omp for schedule (static) collapse(2)
+      for (unsigned int ib=0; ib<n_blocks[2]; ++ib)
+        for (unsigned int jb=0; jb<n_blocks[1]; ++jb)
+          for (unsigned int kb=0; kb<n_blocks[0]; ++kb)
+            for (unsigned int i=ib*blz; i<std::min(n_cells[2], (ib+1)*blz); ++i)
+              for (unsigned int j=jb*bly; j<std::min(n_cells[1], (jb+1)*bly); ++j)
+                {
+                  const unsigned int ii=(i*n_cells[1]+j)*n_cells[0];
+                  #pragma omp simd
+                  for (std::size_t ix=dofs_per_cell*VectorizedArray<Number>::n_array_elements*(kb*blx+ii);
+                       ix<(std::min(n_cells[0], (kb+1)*blx)+ii)*dofs_per_cell*VectorizedArray<Number>::n_array_elements; ++ix)
+                    {
+                      ptr_tmp[ix] = coeff1 * ptr_tmp[ix] + coeff2 * ptr_diag[ix] *
+                        (ptr_new[ix] - ptr_rhs[ix]);
+                      ptr_new[ix] = ptr_old[ix] - ptr_tmp[ix];
+                    }
+                }
+#ifdef LIKWID_PERFMON
+    LIKWID_MARKER_STOP(("dg_laplacian_" + std::to_string(dim) +
+                        "d_deg_" + std::to_string(degree) + "vu").c_str());
+#endif
+    }
+  }
+
 private:
 
   std::vector<double> get_diagonal_jacobian() const

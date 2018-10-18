@@ -16,7 +16,7 @@
 #endif
 
 const unsigned int min_degree = 3;
-const unsigned int max_degree = 14;
+const unsigned int max_degree = 12;
 const unsigned int dimension = 3;
 typedef double value_type;
 //#define DO_BLOCK_SIZE_TEST
@@ -137,7 +137,8 @@ void run_program(const unsigned int vector_size_guess,
       std::cout  << ", MDoFs/s: "
                  << global_size * n_tests / best_avg/1e6 << ", GB/s: "
                  << (double)mem_transfer/best_avg*1e-9 << " GFLOP/s: "
-                 << (double)ops_approx/best_avg*1e-9
+                 << (double)ops_approx/best_avg*1e-9 << " ops/dof: "
+                 << ops_approx / global_size / n_tests
                  << std::endl;
     }
 
@@ -189,6 +190,47 @@ void run_program(const unsigned int vector_size_guess,
                  << global_size * n_tests / best_avg/1e6 << ", GB/s: "
                  << (double)mem_transfer/best_avg*1e-9 << " GFLOP/s: "
                  << (double)ops_approx/best_avg*1e-9
+                 << std::endl;
+    }
+  best_avg = std::numeric_limits<double>::max();
+  for (unsigned int i=0; i<5; ++i)
+    {
+      MPI_Barrier(MPI_COMM_WORLD);
+
+      struct timeval wall_timer;
+      gettimeofday(&wall_timer, NULL);
+      double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
+
+      for (unsigned int t=0; t<n_tests; ++t)
+        evaluator.emulate_cheby_vector_updates();
+
+      gettimeofday(&wall_timer, NULL);
+      double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+
+      double min_time = -1, max_time = -1, avg_time = -1;
+      MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+      MPI_Allreduce(&compute_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+      MPI_Allreduce(&compute_time, &avg_time, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+      best_avg = std::min(best_avg, avg_time/n_procs);
+    }
+  if (rank == 0)
+    {
+      const std::size_t mem = global_size * sizeof(Number) *
+        7 * n_tests;
+      const std::size_t ops = global_size * n_tests * 6;
+      std::cout << "VU degree " << std::setw(2) << degree << "  ";
+      for (unsigned int d=0; d<dim; ++d)
+        std::cout << n_cells[d] << (d<dim-1 ? " x " : "");
+      std::cout << " elem " << evaluator.dofs_per_cell << ", block sizes: "
+                << evaluator.blx*VectorizedArray<Number>::n_array_elements
+                << " x " << evaluator.bly;
+      if (dim==3)
+        std::cout << " x " << evaluator.blz;
+      std::cout  << ", MDoFs/s: "
+                 << global_size * n_tests / best_avg/1e6 << ", GB/s: "
+                 << (double)mem/best_avg*1e-9 << " GFLOP/s: "
+                 << (double)ops/best_avg*1e-9
                  << std::endl;
     }
 
