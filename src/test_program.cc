@@ -49,8 +49,7 @@ void run_program(const unsigned int n_tests)
         evaluator.initialize(n_cell_batches, cartesian);
 
 #ifdef LIKWID_PERFMON
-        if (kernel == 4)
-          LIKWID_MARKER_START(("cell_laplacian_deg_" + std::to_string(degree)).c_str());
+        LIKWID_MARKER_START(("cell_laplacian_deg_" + std::to_string(degree)).c_str());
 #endif
         double tmin = 1e10, tmax = 0, tavg = 0, variance = 0;
 
@@ -83,8 +82,7 @@ void run_program(const unsigned int n_tests)
           }
 
 #ifdef LIKWID_PERFMON
-        if (kernel == 4)
-          LIKWID_MARKER_STOP(("cell_laplacian_deg_" + std::to_string(degree)).c_str());
+        LIKWID_MARKER_STOP(("cell_laplacian_deg_" + std::to_string(degree)).c_str());
 #endif
       }
       double tmin = min_time[0], tmax = max_time[0], tavg = 0, stddev = 0;
