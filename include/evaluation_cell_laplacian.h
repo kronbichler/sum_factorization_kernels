@@ -209,7 +209,8 @@ public:
       data_ptr = my_array;
     else
       {
-        scratch_data_array.resize_fast(2*dofs_per_cell);
+        if (scratch_data_array.size() != 2*dofs_per_cell)
+          scratch_data_array.resize_fast(2*dofs_per_cell);
         data_ptr = scratch_data_array.begin();
       }
     VectorizedArray<Number> merged_array[dim];

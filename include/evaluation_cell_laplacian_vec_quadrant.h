@@ -223,7 +223,8 @@ public:
       data_ptr = my_array;
     else
       {
-        scratch_data_array.resize_fast(4*dofs_per_cell_z);
+        if (scratch_data_array.size() != 4*dofs_per_cell_z)
+          scratch_data_array.resize_fast(4*dofs_per_cell_z);
         data_ptr = scratch_data_array.begin();
       }
 
