@@ -204,7 +204,6 @@ public:
             //  }
           }
 
-        if (my_rank == 0)
           std::cout << "Error of integral in direction " << test << ": "
                     << max_error << std::endl;
       }
