@@ -1632,7 +1632,6 @@ int main(int argc, char** argv)
   if (argc > 1)
     degree = std::atoi(argv[1]);
 
-
   //RunTime<2,min_degree,max_degree,value_type>::run();
   RunTime<3,min_degree,max_degree,value_type>::run(degree, n_tests);
 

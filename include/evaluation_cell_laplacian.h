@@ -11,8 +11,6 @@
 #ifndef evaluation_cell_laplacian_h
 #define evaluation_cell_laplacian_h
 
-#include <mpi.h>
-
 #include "gauss_formula.h"
 #include "lagrange_polynomials.h"
 #include "vectorization.h"
@@ -146,46 +144,41 @@ public:
 #else
         unsigned int cell=0;
 #endif
-          {
-            VectorizedArray<Number> *data_ptr = &output_array[vector_offsets[cell]];
-            const unsigned int stride = test < dim-1 ? (degree+1) : 1;
-            int shift = 1;
-            for (unsigned int d=0; d<test; ++d)
-              shift *= degree+1;
-            if (test != 1)
-              {
-                // normal vector at left is negative, must add boundary
-                // contribution
-                for (unsigned int i=0; i<Utilities::pow(degree+1,dim-1); ++i)
-                  data_ptr[i*stride] += boundary_factor * boundary_integral[i];
-                // normal vector at left is positive, must subtract boundary
-                // contribution
-                for (unsigned int i=0; i<Utilities::pow(degree+1,dim-1); ++i)
-                  data_ptr[degree*shift + i*stride] -= boundary_factor * boundary_integral[i];
-              }
-            else
-              {
-                for (unsigned int j=0; j<=(dim>2?degree:0); ++j)
-                  for (unsigned int i=0; i<=degree; ++i)
-                    {
-                      const unsigned int ind = j*Utilities::pow(degree+1,dim-1) + i;
-                      const unsigned int l = dim>2 ? i*(degree+1)+j : i;
-                      data_ptr[ind] += boundary_factor * boundary_integral[l];
-                      data_ptr[degree*shift+ind] -= boundary_factor * boundary_integral[l];
-                    }
-              }
-            for (unsigned int i=0; i<dofs_per_cell; ++i)
-              for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
-                max_error = std::max(max_error, (double)data_ptr[i][v]);
-          }
+        {
+          VectorizedArray<Number> *data_ptr = &output_array[vector_offsets[cell]];
+          const unsigned int stride = test < dim-1 ? (degree+1) : 1;
+          int shift = 1;
+          for (unsigned int d=0; d<test; ++d)
+            shift *= degree+1;
+          if (test != 1)
+            {
+              // normal vector at left is negative, must add boundary
+              // contribution
+              for (unsigned int i=0; i<Utilities::pow(degree+1,dim-1); ++i)
+                data_ptr[i*stride] += boundary_factor * boundary_integral[i];
+              // normal vector at left is positive, must subtract boundary
+              // contribution
+              for (unsigned int i=0; i<Utilities::pow(degree+1,dim-1); ++i)
+                data_ptr[degree*shift + i*stride] -= boundary_factor * boundary_integral[i];
+            }
+          else
+            {
+              for (unsigned int j=0; j<=(dim>2?degree:0); ++j)
+                for (unsigned int i=0; i<=degree; ++i)
+                  {
+                    const unsigned int ind = j*Utilities::pow(degree+1,dim-1) + i;
+                    const unsigned int l = dim>2 ? i*(degree+1)+j : i;
+                    data_ptr[ind] += boundary_factor * boundary_integral[l];
+                    data_ptr[degree*shift+ind] -= boundary_factor * boundary_integral[l];
+                  }
+            }
+          for (unsigned int i=0; i<dofs_per_cell; ++i)
+            for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+              max_error = std::max(max_error, (double)data_ptr[i][v]);
+        }
 
-        double global_result = -1;
-        MPI_Allreduce(&max_error, &global_result, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-        int my_rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-        if (my_rank == 0)
-          std::cout << "Error of integral in direction " << test << ": "
-                    << global_result << std::endl;
+        std::cout << "Error of integral in direction " << test << ": "
+                  << max_error << std::endl;
       }
   }
 

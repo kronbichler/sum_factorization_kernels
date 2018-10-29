@@ -2,9 +2,8 @@
 #include <iostream>
 #include <iomanip>
 
-#include <mpi.h>
-#include <sys/time.h>
-#include <sys/resource.h>
+#include <omp.h>
+#include <chrono>
 
 #include "evaluation_cell_laplacian.h"
 
@@ -13,118 +12,130 @@
 #endif
 
 const unsigned int min_degree = 1;
-const unsigned int max_degree = 20;
+const unsigned int max_degree = 25;
 
-const std::size_t  vector_size_guess = 50000000;
+const std::size_t  vector_size_guess = 10000;
 const bool         cartesian         = true;
-const unsigned int n_tests           = 100;
 
 typedef double value_type;
 
 
 template <int dim, int degree, typename Number>
-void run_program()
+void run_program(const unsigned int n_tests)
 {
-  int rank = -1;
-  int n_procs = 0;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &n_procs);
-
-  EvaluationCellLaplacian<dim,degree,Number> evaluator;
-  const unsigned int n_cell_batches = std::max(vector_size_guess / VectorizedArray<Number>::n_array_elements / Utilities::pow(degree+1,dim) / n_procs,
+  const unsigned int n_cell_batches = std::max(vector_size_guess / Utilities::pow(degree+1,dim),
                                                1UL);
-  evaluator.initialize(n_cell_batches, cartesian);
-
-  std::size_t local_size = evaluator.n_elements()*evaluator.dofs_per_cell;
-  std::size_t global_size = -1;
-  MPI_Allreduce(&local_size, &global_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
-  if (rank == 0)
-    {
-      std::cout << std::endl;
-      std::cout << "Polynomial degree: " << degree << std::endl;
-      std::cout << "Vector size:       " << global_size << std::endl;
-    }
-
-  evaluator.do_verification();
-
   double best_avg = std::numeric_limits<double>::max();
+#ifdef _OPENMP
+  const unsigned int nthreads = omp_get_max_threads();
+#else
+  const unsigned int nthreads = 1;
+#endif
+
+  {
+    EvaluationCellLaplacian<dim,degree,Number> evaluator;
+    evaluator.initialize(n_cell_batches, cartesian);
+    evaluator.do_verification();
+  }
 
   for (unsigned int i=0; i<3; ++i)
     {
-      MPI_Barrier(MPI_COMM_WORLD);
+      std::vector<double> min_time(nthreads), max_time(nthreads), avg_time(nthreads), std_dev(nthreads);
+#pragma omp parallel shared(min_time, max_time, avg_time, std_dev)
+      {
+        EvaluationCellLaplacian<dim,degree,Number> evaluator;
+        const unsigned int n_cell_batches = std::max(vector_size_guess / Utilities::pow(degree+1,dim),
+                                                     1UL);
+        evaluator.initialize(n_cell_batches, cartesian);
 
 #ifdef LIKWID_PERFMON
-      LIKWID_MARKER_START(("cell_laplacian_deg_" + std::to_string(degree)).c_str());
+        if (kernel == 4)
+          LIKWID_MARKER_START(("cell_laplacian_deg_" + std::to_string(degree)).c_str());
 #endif
+        double tmin = 1e10, tmax = 0, tavg = 0, variance = 0;
 
-      struct timeval wall_timer;
-      gettimeofday(&wall_timer, NULL);
-      double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
+#pragma omp barrier
 
-      for (unsigned int t=0; t<n_tests; ++t)
-        evaluator.matrix_vector_product();
+#pragma omp for schedule(static)
+        for (unsigned int thr=0; thr<nthreads; ++thr)
+          for (unsigned int t=0; t<(50/degree); ++t)
+            evaluator.matrix_vector_product();
 
-      gettimeofday(&wall_timer, NULL);
-      double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+#pragma omp barrier
+
+#pragma omp for schedule(static)
+        for (unsigned int thr=0; thr<nthreads; ++thr)
+          {
+            for (unsigned int t=0; t<n_tests; ++t)
+              {
+                auto t1 = std::chrono::system_clock::now();
+                evaluator.matrix_vector_product();
+                double time = std::chrono::duration<double>(std::chrono::system_clock::now()-t1).count();
+                tmin = std::min(tmin, time);
+                tmax = std::max(tmax, time);
+                variance = (t > 0 ? (double)(t-1)/(t)*variance : 0) + (time - tavg) * (time - tavg) / (t+1);
+                tavg = tavg + (time-tavg)/(t+1);
+              }
+            min_time[thr] = tmin;
+            max_time[thr] = tmax;
+            avg_time[thr] = tavg;
+            std_dev[thr] = std::sqrt(variance);
+          }
 
 #ifdef LIKWID_PERFMON
-      LIKWID_MARKER_STOP(("cell_laplacian_deg_" + std::to_string(degree)).c_str());
+        if (kernel == 4)
+          LIKWID_MARKER_STOP(("cell_laplacian_deg_" + std::to_string(degree)).c_str());
 #endif
-
-      double min_time = -1, max_time = -1, avg_time = -1;
-      MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-      MPI_Allreduce(&compute_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-      MPI_Allreduce(&compute_time, &avg_time, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
-      best_avg = std::min(best_avg, avg_time/n_procs);
-      if (rank == 0)
+      }
+      double tmin = min_time[0], tmax = max_time[0], tavg = 0, stddev = 0;
+      for (unsigned int i=0; i<nthreads; ++i)
         {
-          std::cout << "Time for operation (min/avg/max): "
-                    << min_time/n_tests << " "
-                    << avg_time/n_procs/n_tests << " "
-                    << max_time/n_tests << " "
+          std::cout << "p" << degree << " statistics t" << std::setw(3) << std::right << i << "  ";
+          std::cout << std::setw(12) << avg_time[i]
+                    << "  dev " << std::setw(12) << std_dev[i]
+                    << "  min " << std::setw(12) << min_time[i]
+                    << "  max " << std::setw(12) << max_time[i]
                     << std::endl;
+          tmin = std::min(min_time[i], tmin);
+          tmax = std::max(max_time[i], tmax);
+          tavg += avg_time[i] / nthreads;
+          stddev = std::max(stddev, std_dev[i]);
         }
-    }
-  if (rank == 0)
-    {
-      const std::size_t mem_transfer = global_size * sizeof(Number) *
-        (cartesian ? 3 : 13) * n_tests;
-      const std::size_t ops_approx = global_size / evaluator.dofs_per_cell
-        * (4*dim * (/*add*/2*((degree+1)/2)*2 +
-                    /*mult*/degree+1 +
-                    /*fma*/2*((degree-1)*(degree+1)/2))*Utilities::pow(degree+1,dim-1)
-           + dim * (cartesian ? 2 : (2*dim-1) * 2) * Utilities::pow(degree+1,dim)) * n_tests;
-      std::cout << "Degree " << std::setw(2) << degree
-                << ", DoFs/s: "
-                << global_size * n_tests / best_avg << " with "
-                << (double)mem_transfer/best_avg*1e-9 << " GB/s and "
-                << (double)ops_approx/best_avg*1e-9 << " GFLOP/s"
-                << std::endl;
+      const std::size_t n_dofs = (std::size_t)n_cell_batches * Utilities::pow(degree+1,dim) * VectorizedArray<Number>::n_array_elements * omp_get_max_threads();
+      std::cout << "p" << degree << " statistics tall  ";
+      const std::size_t ops_interpolate = (/*add*/2*((degree+1)/2)*2 +
+                                           /*mult*/degree+1 +
+                                           /*fma*/2*((degree-1)*(degree+1)/2));
+      const std::size_t ops_approx = (std::size_t)n_cell_batches * VectorizedArray<Number>::n_array_elements * omp_get_max_threads()
+        * (4 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
+           + dim * 2 * dim * Utilities::pow(degree+1,dim));
+      std::cout << std::setw(12) << tavg
+                << "  dev " << std::setw(12) << stddev
+                << "  min " << std::setw(12) << tmin
+                << "  max " << std::setw(12) << tmax
+                << "  DoFs/s " << n_dofs / tavg
+                << "  GFlops/s " << 1e-9*ops_approx / tavg
+                << std::endl << std::endl;
+      best_avg = std::min(tavg, best_avg);
     }
 }
+
 
 
 template<int dim, int degree, int max_degree, typename Number>
 class RunTime
 {
 public:
-  static void run()
+  static void run(const unsigned int degree_select,
+                  const unsigned int n_tests)
   {
-    run_program<dim,degree,Number>();
-    RunTime<dim,degree+1,max_degree,Number>::run();
+    if (degree==degree_select)
+      run_program<dim,degree,Number>(n_tests);
+    if (degree < max_degree)
+      RunTime<dim,(degree<max_degree?degree+1:degree),max_degree,Number>::run(degree_select, n_tests);
   }
 };
 
-template <int dim, int degree,typename Number>
-class RunTime<dim,degree,degree,Number>
-{
-public:
-  static void run()
-  {
-    run_program<dim,degree,Number>();
-  }
-};
 
 int main(int argc, char** argv)
 {
@@ -136,12 +147,15 @@ int main(int argc, char** argv)
   }
 #endif
 
-  MPI_Init(&argc, &argv);
+  unsigned int n_tests           = 100;
+  if (argc > 2)
+    n_tests = std::atoi(argv[2]);
+  unsigned int degree = 4;
+  if (argc > 1)
+    degree = std::atoi(argv[1]);
 
   //RunTime<2,min_degree,max_degree,value_type>::run();
-  RunTime<3,min_degree,max_degree,value_type>::run();
-
-  MPI_Finalize();
+  RunTime<3,min_degree,max_degree,value_type>::run(degree, n_tests);
 
 #ifdef LIKWID_PERFMON
   LIKWID_MARKER_CLOSE;
