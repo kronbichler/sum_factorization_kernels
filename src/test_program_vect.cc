@@ -5,7 +5,7 @@
 #include <omp.h>
 #include <chrono>
 
-#include "evaluation_cell_laplacian_no_vec.h"
+#include "evaluation_cell_laplacian_vec_ele.h"
 
 #ifdef LIKWID_PERFMON
 #include <likwid.h>
@@ -149,7 +149,7 @@ int main(int argc, char** argv)
     degree = std::atoi(argv[1]);
 
   //RunTime<2,min_degree,max_degree,value_type>::run();
-  RunTime<3,min_degree,max_degree,value_type>::run(degree, n_tests);
+  RunTime<2,min_degree,max_degree,value_type>::run(degree, n_tests);
 
 #ifdef LIKWID_PERFMON
   LIKWID_MARKER_CLOSE;

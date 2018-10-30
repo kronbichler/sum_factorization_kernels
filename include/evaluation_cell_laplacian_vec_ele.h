@@ -190,7 +190,7 @@ public:
 
   void matrix_vector_product()
   {
-    static_assert(dim==3, "Only 3D implemented.");
+    static_assert(dim == 2 || dim==3, "Only 3D implemented.");
 
     if (degree < 1)
       return;
@@ -211,9 +211,9 @@ public:
       }
 #else
     AlignedVector<VectorizedArray<Number> > scratch_data_array;
-    VectorizedArray<Number> my_array[degree < 17 ? 2*dofs_per_cell : 1];
+    VectorizedArray<Number> my_array[degree < 27 ? 2*dofs_per_cell : 1];
     VectorizedArray<Number> *__restrict data_ptr;
-    if (degree < 17)
+    if (degree < 27)
       data_ptr = my_array;
     else
       {
@@ -221,8 +221,8 @@ public:
           scratch_data_array.resize_fast(2*dofs_per_cell);
         data_ptr = scratch_data_array.begin();
       }
-    VectorizedArray<Number> merged_array[dim];
-    for (unsigned int d=0; d<dim; ++d)
+    VectorizedArray<Number> merged_array[dim*(dim+1)/2];
+    for (unsigned int d=0; d<dim*(dim+1)/2; ++d)
       merged_array[d] = VectorizedArray<Number>();
 
     const bool is_cartesian = jxw_data.size() == 1;
@@ -247,7 +247,7 @@ public:
         //for (unsigned int i=0; i<dofs_per_cell; ++i)
         //  std::cout << input_ptr[i] << " ";
         //std::cout << std::endl;
-        const unsigned int n_xy = nn * nn;
+        const unsigned int n_xy = Utilities::pow(degree+1,dim-1);
         const unsigned int n_chunks = (nn+VectorizedArray<Number>::n_array_elements-1)/VectorizedArray<Number>::n_array_elements;
         unsigned int offset2[VectorizedArray<Number>::n_array_elements];
         for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
@@ -309,7 +309,7 @@ public:
           {
             // x-direction
             VectorizedArray<Number> *__restrict in = data_ptr + i2*z_offset;
-            for (unsigned int i1=0; i1<nn; ++i1)
+            for (unsigned int i1=0; i1<(dim>2?nn:1); ++i1)
               {
                 VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
                 for (unsigned int i=0; i<mid; ++i)
@@ -334,30 +334,33 @@ public:
                     in[i1*nn+nn-1-col] = r0 - r1;
                   }
               }
-            // y-direction
-            for (unsigned int i1=0; i1<nn; ++i1)
+            if (dim > 2)
               {
-                VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
-                for (unsigned int i=0; i<mid; ++i)
+                // y-direction
+                for (unsigned int i1=0; i1<nn; ++i1)
                   {
-                    xp[i] = in[i*nn+i1] + in[(nn-1-i)*nn+i1];
-                    xm[i] = in[i*nn+i1] - in[(nn-1-i)*nn+i1];
-                  }
-                for (unsigned int col=0; col<mid; ++col)
-                  {
-                    VectorizedArray<Number> r0, r1;
-                    r0 = shape_vals[col]                 * xp[0];
-                    r1 = shape_vals[degree*offset + col] * xm[0];
-                    for (unsigned int ind=1; ind<mid; ++ind)
+                    VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
+                    for (unsigned int i=0; i<mid; ++i)
                       {
-                        r0 += shape_vals[ind*offset+col]          * xp[ind];
-                        r1 += shape_vals[(degree-ind)*offset+col] * xm[ind];
+                        xp[i] = in[i*nn+i1] + in[(nn-1-i)*nn+i1];
+                        xm[i] = in[i*nn+i1] - in[(nn-1-i)*nn+i1];
                       }
-                    if (nn % 2 == 1)
-                      r0 += shape_vals[mid*offset+col] * in[i1+mid*nn];
+                    for (unsigned int col=0; col<mid; ++col)
+                      {
+                        VectorizedArray<Number> r0, r1;
+                        r0 = shape_vals[col]                 * xp[0];
+                        r1 = shape_vals[degree*offset + col] * xm[0];
+                        for (unsigned int ind=1; ind<mid; ++ind)
+                          {
+                            r0 += shape_vals[ind*offset+col]          * xp[ind];
+                            r1 += shape_vals[(degree-ind)*offset+col] * xm[ind];
+                          }
+                        if (nn % 2 == 1)
+                          r0 += shape_vals[mid*offset+col] * in[i1+mid*nn];
 
-                    in[i1+col*nn]        = r0 + r1;
-                    in[i1+(nn-1-col)*nn] = r0 - r1;
+                        in[i1+col*nn]        = r0 + r1;
+                        in[i1+(nn-1-col)*nn] = r0 - r1;
+                      }
                   }
               }
           }
@@ -365,58 +368,6 @@ public:
         //  for (unsigned int i=0; i<n_xy; ++i)
         //    std::cout << data_ptr[i][v] << " ";
         //std::cout << std::endl;
-
-        // z-derivative
-        if (dim == 3)
-          for (unsigned int i1=0; i1<n_xy; i1+=VectorizedArray<Number>::n_array_elements)
-            {
-              for (unsigned int i=0; i<n_chunks; ++i)
-                vectorized_load_and_transpose(VectorizedArray<Number>::n_array_elements,
-                                              &data_ptr[i1+i*z_offset][0], offset2,
-                                              &xo[i*VectorizedArray<Number>::n_array_elements]);
-              VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
-              for (unsigned int i=0; i<mid; ++i)
-                {
-                  xp[i] = xo[i] - xo[nn-1-i];
-                  xm[i] = xo[i] + xo[nn-1-i];
-                }
-              for (unsigned int col=0; col<mid; ++col)
-                {
-                  VectorizedArray<Number> r0, r1;
-                  r0 = shape_grads[col]                 * xp[0];
-                  r1 = shape_grads[degree*offset + col] * xm[0];
-                  for (unsigned int ind=1; ind<mid; ++ind)
-                    {
-                      r0 += shape_grads[ind*offset+col]          * xp[ind];
-                      r1 += shape_grads[(degree-ind)*offset+col] * xm[ind];
-                    }
-                  if (nn % 2 == 1)
-                    r1 += shape_grads[mid*offset+col] * xo[mid];
-
-                  xo[col] = r0 + r1;
-                  xo[nn-1-col] = r0 - r1;
-                }
-              if (nn%2==1)
-                {
-                  VectorizedArray<Number> r0 = shape_grads[mid] * xp[0];
-                  for (unsigned int ind=1; ind<mid; ++ind)
-                    r0 += shape_grads[ind*offset+mid] * xp[ind];
-                  xo[mid] = r0;
-                }
-              for (unsigned int i=0; i<n_chunks; ++i)
-                vectorized_transpose_and_store(false, VectorizedArray<Number>::n_array_elements,
-                                               &xo[i*VectorizedArray<Number>::n_array_elements],
-                                               offset2,
-                                               &data_ptr[dofs_per_cell+i1+i*z_offset][0]);
-            }
-          //for (unsigned int v=0; v<nn; ++v)
-          //  for (unsigned int i=0; i<n_xy; ++i)
-          // std::cout << data_ptr[dofs_per_cell+i][v] << " ";
-        //std::cout << std::endl;
-
-        // --------------------------------------------------------------------
-        // mix with loop over quadrature points. depends on the data layout in
-        // MappingInfo
         const VectorizedArray<Number> *__restrict jxw_ptr =
           jxw_data.begin() + data_offsets[cell];
         const VectorizedArray<Number> *__restrict jacobian_ptr =
@@ -426,47 +377,98 @@ public:
             merged_array[d] = jxw_ptr[0] * jacobian_ptr[d] *
               jacobian_ptr[d];
 
+        // z-derivative
+        for (unsigned int i1=0; i1<n_xy; i1+=VectorizedArray<Number>::n_array_elements)
+          {
+            for (unsigned int i=0; i<n_chunks; ++i)
+              vectorized_load_and_transpose(VectorizedArray<Number>::n_array_elements,
+                                            &data_ptr[i1+i*z_offset][0], offset2,
+                                            &xo[i*VectorizedArray<Number>::n_array_elements]);
+            VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
+            for (unsigned int i=0; i<mid; ++i)
+              {
+                xp[i] = xo[i] - xo[nn-1-i];
+                xm[i] = xo[i] + xo[nn-1-i];
+              }
+            for (unsigned int col=0; col<mid; ++col)
+              {
+                VectorizedArray<Number> r0, r1;
+                r0 = shape_grads[col]                 * xp[0];
+                r1 = shape_grads[degree*offset + col] * xm[0];
+                for (unsigned int ind=1; ind<mid; ++ind)
+                  {
+                    r0 += shape_grads[ind*offset+col]          * xp[ind];
+                    r1 += shape_grads[(degree-ind)*offset+col] * xm[ind];
+                  }
+                if (nn % 2 == 1)
+                  r1 += shape_grads[mid*offset+col] * xo[mid];
+
+                xo[col] = r0 + r1;
+                xo[nn-1-col] = r0 - r1;
+              }
+            if (nn%2==1)
+              {
+                VectorizedArray<Number> r0 = shape_grads[mid] * xp[0];
+                for (unsigned int ind=1; ind<mid; ++ind)
+                  r0 += shape_grads[ind*offset+mid] * xp[ind];
+                xo[mid] = r0;
+              }
+            for (unsigned int i=0; i<n_chunks; ++i)
+              vectorized_transpose_and_store(false, VectorizedArray<Number>::n_array_elements,
+                                             &xo[i*VectorizedArray<Number>::n_array_elements],
+                                             offset2,
+                                             &data_ptr[dofs_per_cell+i1+i*z_offset][0]);
+          }
+          //for (unsigned int v=0; v<nn; ++v)
+          //  for (unsigned int i=0; i<n_xy; ++i)
+          // std::cout << data_ptr[dofs_per_cell+i][v] << " ";
+        //std::cout << std::endl;
+
+        // --------------------------------------------------------------------
         for (unsigned int i2=0; i2<n_chunks; ++i2)
           {
             VectorizedArray<Number> *__restrict in = data_ptr + i2*z_offset;
             VectorizedArray<Number> *__restrict outz = data_ptr + dofs_per_cell;
             VectorizedArray<Number> outy[nn*nn];
-            // y-derivative
-            for (unsigned int i1=0; i1<nn; ++i1) // loop over x layers
+            if (dim>2)
               {
-                VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
-                for (unsigned int i=0; i<mid; ++i)
+                // y-derivative
+                for (unsigned int i1=0; i1<nn; ++i1) // loop over x layers
                   {
-                    xp[i] = in[i*nn+i1] - in[(nn-1-i)*nn+i1];
-                    xm[i] = in[i*nn+i1] + in[(nn-1-i)*nn+i1];
-                  }
-                for (unsigned int col=0; col<mid; ++col)
-                  {
-                    VectorizedArray<Number> r0, r1;
-                    r0 = shape_grads[col]                 * xp[0];
-                    r1 = shape_grads[degree*offset + col] * xm[0];
-                    for (unsigned int ind=1; ind<mid; ++ind)
+                    VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
+                    for (unsigned int i=0; i<mid; ++i)
                       {
-                        r0 += shape_grads[ind*offset+col]          * xp[ind];
-                        r1 += shape_grads[(degree-ind)*offset+col] * xm[ind];
+                        xp[i] = in[i*nn+i1] - in[(nn-1-i)*nn+i1];
+                        xm[i] = in[i*nn+i1] + in[(nn-1-i)*nn+i1];
                       }
-                    if (nn % 2 == 1)
-                      r1 += shape_grads[mid*offset+col] * in[i1+mid*nn];
+                    for (unsigned int col=0; col<mid; ++col)
+                      {
+                        VectorizedArray<Number> r0, r1;
+                        r0 = shape_grads[col]                 * xp[0];
+                        r1 = shape_grads[degree*offset + col] * xm[0];
+                        for (unsigned int ind=1; ind<mid; ++ind)
+                          {
+                            r0 += shape_grads[ind*offset+col]          * xp[ind];
+                            r1 += shape_grads[(degree-ind)*offset+col] * xm[ind];
+                          }
+                        if (nn % 2 == 1)
+                          r1 += shape_grads[mid*offset+col] * in[i1+mid*nn];
 
-                    outy[i1+col*nn]        = r0 + r1;
-                    outy[i1+(nn-1-col)*nn] = r0 - r1;
-                  }
-                if (nn%2 == 1)
-                  {
-                    VectorizedArray<Number> r0 = shape_grads[mid] * xp[0];
-                    for (unsigned int ind=1; ind<mid; ++ind)
-                      r0 += shape_grads[ind*offset+mid] * xp[ind];
-                    outy[i1+nn*mid] = r0;
+                        outy[i1+col*nn]        = r0 + r1;
+                        outy[i1+(nn-1-col)*nn] = r0 - r1;
+                      }
+                    if (nn%2 == 1)
+                      {
+                        VectorizedArray<Number> r0 = shape_grads[mid] * xp[0];
+                        for (unsigned int ind=1; ind<mid; ++ind)
+                          r0 += shape_grads[ind*offset+mid] * xp[ind];
+                        outy[i1+nn*mid] = r0;
+                      }
                   }
               }
 
             // x-derivative
-            for (unsigned int i1=0; i1<nn; ++i1) // loop over y layers
+            for (unsigned int i1=0; i1<(dim>2?nn:1); ++i1) // loop over y layers
               {
                 VectorizedArray<Number> outx[nn];
                 VectorizedArray<Number> inx[nn];
@@ -509,11 +511,24 @@ public:
                       //std::cout << inx[i][0] << " " << inx[i][1] << " "
                       //          << outy[i1*nn+i][0] << " " << outy[i1*nn+i][1] << " "
                       //          << outz[i2*z_offset+i1*nn+i][0] << " " << outz[i2*z_offset+i1*nn+i][1] << std::endl;
-                      const VectorizedArray<Number> weight = quadrature_weights_vect[i2*nn*nn+i1*nn+i];
-                      outx[i] = inx[i] * weight * merged_array[0];
-                      outy[i1*nn+i] *= weight * merged_array[1];
-                      if (dim == 3)
-                        outz[i2*z_offset+i1*nn+i] *= weight * merged_array[2];
+                      const unsigned int q = (i2*nn+i1)*(dim>2?nn:1)+i;
+                      const VectorizedArray<Number> weight = quadrature_weights_vect[q];
+                      if (dim==2)
+                        {
+                          VectorizedArray<Number> t0 = inx[i]*merged_array[0] + outz[i2*z_offset+i]*merged_array[2];
+                          VectorizedArray<Number> t1 = inx[i]*merged_array[2] + outz[i2*z_offset+i]*merged_array[1];
+                          outx[i] = t0 * weight;
+                          outz[i2*z_offset+i] = t1 * weight;
+                        }
+                      else if (dim==3)
+                        {
+                          VectorizedArray<Number> t0 = inx[i]*merged_array[0] + outy[i1*nn+i]*merged_array[3]+outz[i2*z_offset+i1*nn+i]*merged_array[4];
+                          VectorizedArray<Number> t1 = inx[i]*merged_array[3] + outy[i1*nn+i]*merged_array[1]+outz[i2*z_offset+i1*nn+i]*merged_array[5];
+                          VectorizedArray<Number> t2 = inx[i]*merged_array[4] + outy[i1*nn+i]*merged_array[5]+outz[i2*z_offset+i1*nn+i]*merged_array[2];
+                          outx[i] = t0 * weight;
+                          outy[i1*nn+i] = t1 * weight;
+                          outz[i2*z_offset+i1*nn+i] = t2 * weight;
+                        }
                     }
                 else
                   throw;
@@ -555,40 +570,43 @@ public:
             //  std::cout << in[i][v] << " ";
             //std::cout << std::endl;
 
-            // y-derivative
-            for (unsigned int i1=0; i1<nn; ++i1) // loop over x layers
+            if (dim>2)
               {
-                VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
-                for (unsigned int i=0; i<mid; ++i)
+                // y-derivative
+                for (unsigned int i1=0; i1<nn; ++i1) // loop over x layers
                   {
-                    xp[i] = outy[i*nn+i1] + outy[(nn-1-i)*nn+i1];
-                    xm[i] = outy[i*nn+i1] - outy[(nn-1-i)*nn+i1];
-                  }
-                for (unsigned int col=0; col<mid; ++col)
-                  {
-                    VectorizedArray<Number> r0, r1;
-                    r0 = shape_grads[col*offset]          * xp[0];
-                    r1 = shape_grads[(degree-col)*offset] * xm[0];
-                    for (unsigned int ind=1; ind<mid; ++ind)
+                    VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
+                    for (unsigned int i=0; i<mid; ++i)
                       {
-                        r0 += shape_grads[col*offset+ind]          * xp[ind];
-                        r1 += shape_grads[(degree-col)*offset+ind] * xm[ind];
+                        xp[i] = outy[i*nn+i1] + outy[(nn-1-i)*nn+i1];
+                        xm[i] = outy[i*nn+i1] - outy[(nn-1-i)*nn+i1];
                       }
-                    if (nn % 2 == 1)
-                      r0 += shape_grads[col*offset+mid] * outy[i1+mid*nn];
+                    for (unsigned int col=0; col<mid; ++col)
+                      {
+                        VectorizedArray<Number> r0, r1;
+                        r0 = shape_grads[col*offset]          * xp[0];
+                        r1 = shape_grads[(degree-col)*offset] * xm[0];
+                        for (unsigned int ind=1; ind<mid; ++ind)
+                          {
+                            r0 += shape_grads[col*offset+ind]          * xp[ind];
+                            r1 += shape_grads[(degree-col)*offset+ind] * xm[ind];
+                          }
+                        if (nn % 2 == 1)
+                          r0 += shape_grads[col*offset+mid] * outy[i1+mid*nn];
 
-                    in[i1+col*nn]        += r0 + r1;
-                    in[i1+(nn-1-col)*nn] += r1 - r0;
+                        in[i1+col*nn]        += r0 + r1;
+                        in[i1+(nn-1-col)*nn] += r1 - r0;
+                      }
+                    if (nn%2 == 1)
+                      {
+                        VectorizedArray<Number> r0 = in[i1+nn*mid];
+                        for (unsigned int ind=0; ind<mid; ++ind)
+                          r0 += shape_grads[ind+mid*offset] * xm[ind];
+                        in[i1+nn*mid] = r0;
+                      }
                   }
-                if (nn%2 == 1)
-                  {
-                    VectorizedArray<Number> r0 = in[i1+nn*mid];
-                    for (unsigned int ind=0; ind<mid; ++ind)
-                      r0 += shape_grads[ind+mid*offset] * xm[ind];
-                    in[i1+nn*mid] = r0;
-                  }
-              }
-          } // end of loop over z layers
+              } // end of loop over z layers
+          }
         //std::cout << "before z der: ";
         //for (unsigned int v=0; v<nn; ++v)
         //  for (unsigned int i=0; i<n_xy; ++i)
@@ -596,48 +614,47 @@ public:
         //std::cout << std::endl;
 
         // z-derivative
-        if (dim == 3)
-          for (unsigned int i1=0; i1<n_xy; i1+=VectorizedArray<Number>::n_array_elements)
-            {
-              for (unsigned int i=0; i<n_chunks; ++i)
-                vectorized_load_and_transpose(VectorizedArray<Number>::n_array_elements,
-                                              &data_ptr[dofs_per_cell+i1+i*z_offset][0], offset2,
-                                              &xo[i*VectorizedArray<Number>::n_array_elements]);
-              VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
-              for (unsigned int i=0; i<mid; ++i)
-                {
-                  xp[i] = xo[i] + xo[nn-1-i];
-                  xm[i] = xo[i] - xo[nn-1-i];
-                }
-              for (unsigned int col=0; col<mid; ++col)
-                {
-                  VectorizedArray<Number> r0, r1;
-                  r0 = shape_grads[col*offset]          * xp[0];
-                  r1 = shape_grads[(degree-col)*offset] * xm[0];
-                  for (unsigned int ind=1; ind<mid; ++ind)
-                    {
-                      r0 += shape_grads[col*offset+ind]          * xp[ind];
-                      r1 += shape_grads[(degree-col)*offset+ind] * xm[ind];
-                    }
-                  if (nn % 2 == 1)
-                    r0 += shape_grads[col*offset+mid] * xo[mid];
+        for (unsigned int i1=0; i1<n_xy; i1+=VectorizedArray<Number>::n_array_elements)
+          {
+            for (unsigned int i=0; i<n_chunks; ++i)
+              vectorized_load_and_transpose(VectorizedArray<Number>::n_array_elements,
+                                            &data_ptr[dofs_per_cell+i1+i*z_offset][0], offset2,
+                                            &xo[i*VectorizedArray<Number>::n_array_elements]);
+            VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
+            for (unsigned int i=0; i<mid; ++i)
+              {
+                xp[i] = xo[i] + xo[nn-1-i];
+                xm[i] = xo[i] - xo[nn-1-i];
+              }
+            for (unsigned int col=0; col<mid; ++col)
+              {
+                VectorizedArray<Number> r0, r1;
+                r0 = shape_grads[col*offset]          * xp[0];
+                r1 = shape_grads[(degree-col)*offset] * xm[0];
+                for (unsigned int ind=1; ind<mid; ++ind)
+                  {
+                    r0 += shape_grads[col*offset+ind]          * xp[ind];
+                    r1 += shape_grads[(degree-col)*offset+ind] * xm[ind];
+                  }
+                if (nn % 2 == 1)
+                  r0 += shape_grads[col*offset+mid] * xo[mid];
 
-                  xo[col] = r0 + r1;
-                  xo[nn-1-col] = r1 - r0;
-                }
-              if (nn%2==1)
-                {
-                  VectorizedArray<Number> r0 = shape_grads[mid*offset] * xm[0];
-                  for (unsigned int ind=1; ind<mid; ++ind)
-                    r0 += shape_grads[ind+mid*offset] * xm[ind];
-                  xo[mid] = r0;
-                }
-              for (unsigned int i=0; i<n_chunks; ++i)
-                vectorized_transpose_and_store(true, VectorizedArray<Number>::n_array_elements,
-                                               &xo[i*VectorizedArray<Number>::n_array_elements],
-                                               offset2,
-                                               &data_ptr[i1+i*z_offset][0]);
-            }
+                xo[col] = r0 + r1;
+                xo[nn-1-col] = r1 - r0;
+              }
+            if (nn%2==1)
+              {
+                VectorizedArray<Number> r0 = shape_grads[mid*offset] * xm[0];
+                for (unsigned int ind=1; ind<mid; ++ind)
+                  r0 += shape_grads[ind+mid*offset] * xm[ind];
+                xo[mid] = r0;
+              }
+            for (unsigned int i=0; i<n_chunks; ++i)
+              vectorized_transpose_and_store(true, VectorizedArray<Number>::n_array_elements,
+                                             &xo[i*VectorizedArray<Number>::n_array_elements],
+                                             offset2,
+                                             &data_ptr[i1+i*z_offset][0]);
+          }
         //std::cout << "after z der:  ";
         //for (unsigned int v=0; v<nn; ++v)
         //  for (unsigned int i=0; i<n_xy; ++i)
@@ -647,40 +664,43 @@ public:
         for (unsigned int i2=0; i2<n_chunks; ++i2)
           {
             VectorizedArray<Number> *__restrict in = data_ptr + i2*z_offset;
-            // y-direction
-            for (unsigned int i1=0; i1<nn; ++i1)
+            if (dim>2)
               {
-                VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
-                for (unsigned int i=0; i<mid; ++i)
+                // y-direction
+                for (unsigned int i1=0; i1<nn; ++i1)
                   {
-                    xp[i] = in[i*nn+i1] + in[(nn-1-i)*nn+i1];
-                    xm[i] = in[i*nn+i1] - in[(nn-1-i)*nn+i1];
-                  }
-                for (unsigned int col=0; col<mid; ++col)
-                  {
-                    VectorizedArray<Number> r0, r1;
-                    r0 = shape_vals[col*offset]          * xp[0];
-                    r1 = shape_vals[(degree-col)*offset] * xm[0];
-                    for (unsigned int ind=1; ind<mid; ++ind)
+                    VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
+                    for (unsigned int i=0; i<mid; ++i)
                       {
-                        r0 += shape_vals[col*offset+ind]          * xp[ind];
-                        r1 += shape_vals[(degree-col)*offset+ind] * xm[ind];
+                        xp[i] = in[i*nn+i1] + in[(nn-1-i)*nn+i1];
+                        xm[i] = in[i*nn+i1] - in[(nn-1-i)*nn+i1];
                       }
+                    for (unsigned int col=0; col<mid; ++col)
+                      {
+                        VectorizedArray<Number> r0, r1;
+                        r0 = shape_vals[col*offset]          * xp[0];
+                        r1 = shape_vals[(degree-col)*offset] * xm[0];
+                        for (unsigned int ind=1; ind<mid; ++ind)
+                          {
+                            r0 += shape_vals[col*offset+ind]          * xp[ind];
+                            r1 += shape_vals[(degree-col)*offset+ind] * xm[ind];
+                          }
 
-                    in[i1+col*nn]        = r0 + r1;
-                    in[i1+(nn-1-col)*nn] = r0 - r1;
-                  }
-                if (nn%2==1)
-                  {
-                    // sum into because shape value is one in the middle
-                    VectorizedArray<Number> r0 = in[i1+mid*nn];
-                    for (unsigned int ind=0; ind<mid; ++ind)
-                      r0 += shape_vals[ind+mid*offset] * xp[ind];
-                    in[i1+mid*nn] = r0;
+                        in[i1+col*nn]        = r0 + r1;
+                        in[i1+(nn-1-col)*nn] = r0 - r1;
+                      }
+                    if (nn%2==1)
+                      {
+                        // sum into because shape value is one in the middle
+                        VectorizedArray<Number> r0 = in[i1+mid*nn];
+                        for (unsigned int ind=0; ind<mid; ++ind)
+                          r0 += shape_vals[ind+mid*offset] * xp[ind];
+                        in[i1+mid*nn] = r0;
+                      }
                   }
               }
             // x-direction
-            for (unsigned int i1=0; i1<nn; ++i1)
+            for (unsigned int i1=0; i1<(dim>2?nn:1); ++i1)
               {
                 VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
                 for (unsigned int i=0; i<mid; ++i)

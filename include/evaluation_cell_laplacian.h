@@ -213,8 +213,8 @@ public:
           scratch_data_array.resize_fast(2*dofs_per_cell);
         data_ptr = scratch_data_array.begin();
       }
-    VectorizedArray<Number> merged_array[dim];
-    for (unsigned int d=0; d<dim; ++d)
+    VectorizedArray<Number> merged_array[dim*(dim+1)/2];
+    for (unsigned int d=0; d<dim*(dim+1)/2; ++d)
       merged_array[d] = VectorizedArray<Number>();
 
     const bool is_cartesian = jxw_data.size() == 1;
@@ -355,10 +355,22 @@ public:
                     {
                       const VectorizedArray<Number> weight =
                         make_vectorized_array(quadrature_weights[i2*nn*nn+i1*nn+i]);
-                      outx[i] = inx[i] * weight * merged_array[0];
-                      outy[i1*nn+i] *= weight * merged_array[1];
-                      if (dim == 3)
-                        outz[i2*nn*nn+i1*nn+i] *= weight * merged_array[2];
+                      if (dim==2)
+                        {
+                          VectorizedArray<Number> t0 = inx[i]*merged_array[0] + outy[i1*nn+i]*merged_array[2];
+                          VectorizedArray<Number> t1 = inx[i]*merged_array[2] + outy[i1*nn+i]*merged_array[1];
+                          outx[i] = t0 * weight;
+                          outy[i1*nn+i] = t1 * weight;
+                        }
+                      else if (dim==3)
+                        {
+                          VectorizedArray<Number> t0 = inx[i]*merged_array[0] + outy[i1*nn+i]*merged_array[3]+outz[i2*nn*nn+i1*nn+i]*merged_array[4];
+                          VectorizedArray<Number> t1 = inx[i]*merged_array[3] + outy[i1*nn+i]*merged_array[1]+outz[i2*nn*nn+i1*nn+i]*merged_array[5];
+                          VectorizedArray<Number> t2 = inx[i]*merged_array[4] + outy[i1*nn+i]*merged_array[5]+outz[i2*nn*nn+i1*nn+i]*merged_array[2];
+                          outx[i] = t0 * weight;
+                          outy[i1*nn+i] = t1 * weight;
+                          outz[i2*nn*nn+i1*nn+i] = t2 * weight;
+                        }
                     }
                 else
                   for (unsigned int i=0; i<nn; ++i)
