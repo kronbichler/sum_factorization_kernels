@@ -216,9 +216,9 @@ public:
 
     constexpr unsigned int dofs_per_cell_z = dofs_per_cell / VectorizedArray<Number>::n_array_elements;
     AlignedVector<VectorizedArray<Number> > scratch_data_array;
-    VectorizedArray<Number> my_array[degree < 17 ? 4*dofs_per_cell_z : 1];
+    VectorizedArray<Number> my_array[degree < 27 ? 4*dofs_per_cell_z : 1];
     VectorizedArray<Number> *__restrict data_ptr;
-    if (degree < 17)
+    if (degree < 27)
       data_ptr = my_array;
     else
       {

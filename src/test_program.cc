@@ -14,7 +14,7 @@
 const unsigned int min_degree = 1;
 const unsigned int max_degree = 25;
 
-const std::size_t  vector_size_guess = 10000;
+const std::size_t  vector_size_guess = 50000;
 const bool         cartesian         = true;
 
 typedef double value_type;
@@ -23,8 +23,7 @@ typedef double value_type;
 template <int dim, int degree, typename Number>
 void run_program(const unsigned int n_tests)
 {
-  const unsigned int n_cell_batches = std::max(vector_size_guess / Utilities::pow(degree+1,dim),
-                                               1UL);
+  const unsigned int n_cell_batches = (vector_size_guess+Utilities::pow(degree+1,dim+1)-1) / Utilities::pow(degree+1,dim+1);
   double best_avg = std::numeric_limits<double>::max();
 #ifdef _OPENMP
   const unsigned int nthreads = omp_get_max_threads();
@@ -44,8 +43,6 @@ void run_program(const unsigned int n_tests)
 #pragma omp parallel shared(min_time, max_time, avg_time, std_dev)
       {
         EvaluationCellLaplacian<dim,degree,Number> evaluator;
-        const unsigned int n_cell_batches = std::max(vector_size_guess / Utilities::pow(degree+1,dim),
-                                                     1UL);
         evaluator.initialize(n_cell_batches, cartesian);
 
 #ifdef LIKWID_PERFMON
@@ -57,7 +54,7 @@ void run_program(const unsigned int n_tests)
 
 #pragma omp for schedule(static)
         for (unsigned int thr=0; thr<nthreads; ++thr)
-          for (unsigned int t=0; t<(50/degree); ++t)
+          for (unsigned int t=0; t<500; ++t)
             evaluator.matrix_vector_product();
 
 #pragma omp barrier
@@ -153,7 +150,7 @@ int main(int argc, char** argv)
     degree = std::atoi(argv[1]);
 
   //RunTime<2,min_degree,max_degree,value_type>::run();
-  RunTime<3,min_degree,max_degree,value_type>::run(degree, n_tests);
+  RunTime<2,min_degree,max_degree,value_type>::run(degree, n_tests);
 
 #ifdef LIKWID_PERFMON
   LIKWID_MARKER_CLOSE;

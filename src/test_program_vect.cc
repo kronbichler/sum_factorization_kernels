@@ -5,7 +5,7 @@
 #include <omp.h>
 #include <chrono>
 
-#include "evaluation_cell_laplacian_vec_quadrant_tile.h"
+#include "evaluation_cell_laplacian_no_vec.h"
 
 #ifdef LIKWID_PERFMON
 #include <likwid.h>
@@ -14,7 +14,7 @@
 const unsigned int min_degree = 1;
 const unsigned int max_degree = 25;
 
-const std::size_t  vector_size_guess = 10000;
+const std::size_t  vector_size_guess = 200000;
 const bool         cartesian         = true;
 
 typedef double value_type;
@@ -23,8 +23,7 @@ typedef double value_type;
 template <int dim, int degree, typename Number>
 void run_program(const unsigned int n_tests)
 {
-  const unsigned int n_cell_batches = std::max(vector_size_guess / Utilities::pow(degree+1,dim),
-                                               1UL);
+  const unsigned int n_cell_batches = (vector_size_guess+Utilities::pow(degree+1,dim+1)-1) / Utilities::pow(degree+1,dim+1);
   double best_avg = std::numeric_limits<double>::max();
 #ifdef _OPENMP
   const unsigned int nthreads = omp_get_max_threads();
@@ -43,8 +42,6 @@ void run_program(const unsigned int n_tests)
 #pragma omp parallel shared(min_time, max_time, avg_time, std_dev)
       {
         EvaluationCellLaplacianVecEle<dim,degree,Number> evaluator;
-        const unsigned int n_cell_batches = std::max(vector_size_guess / Utilities::pow(degree+1,dim),
-                                                     1UL);
         evaluator.initialize(n_cell_batches, cartesian);
 
 #ifdef LIKWID_PERFMON
@@ -56,7 +53,7 @@ void run_program(const unsigned int n_tests)
 
 #pragma omp for schedule(static)
         for (unsigned int thr=0; thr<nthreads; ++thr)
-          for (unsigned int t=0; t<(50/degree); ++t)
+          for (unsigned int t=0; t<500; ++t)
             evaluator.matrix_vector_product();
 
 #pragma omp barrier
@@ -129,7 +126,7 @@ public:
     if (degree==degree_select)
       run_program<dim,degree,Number>(n_tests);
     if (degree < max_degree)
-      RunTime<dim,(degree<max_degree?degree+2:degree),max_degree,Number>::run(degree_select, n_tests);
+      RunTime<dim,(degree<max_degree?degree+1:degree),max_degree,Number>::run(degree_select, n_tests);
   }
 };
 

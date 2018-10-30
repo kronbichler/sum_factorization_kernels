@@ -11,8 +11,6 @@
 #ifndef evaluation_cell_laplacian_h
 #define evaluation_cell_laplacian_h
 
-#include <mpi.h>
-
 #include "gauss_formula.h"
 #include "lagrange_polynomials.h"
 #include "aligned_vector.h"
@@ -176,13 +174,8 @@ public:
               max_error = std::max(max_error, (double)data_ptr[i]);
           }
 
-        double global_result = -1;
-        MPI_Allreduce(&max_error, &global_result, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-        int my_rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-        if (my_rank == 0)
           std::cout << "Error of integral in direction " << test << ": "
-                    << global_result << std::endl;
+                    << max_error << std::endl;
       }
   }
 
@@ -207,9 +200,9 @@ public:
       }
 #else
     AlignedVector<Number > scratch_data_array;
-    Number my_array[degree < 17 ? 2*dofs_per_cell : 1];
+    Number my_array[degree < 27 ? 2*dofs_per_cell : 1];
     Number *__restrict data_ptr;
-    if (degree < 17)
+    if (degree < 27)
       data_ptr = my_array;
     else
       {

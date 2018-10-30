@@ -203,9 +203,9 @@ public:
       }
 #else
     AlignedVector<VectorizedArray<Number> > scratch_data_array;
-    VectorizedArray<Number> my_array[degree < 13 ? 2*dofs_per_cell : 1];
+    VectorizedArray<Number> my_array[degree < 27 ? 2*dofs_per_cell : 1];
     VectorizedArray<Number> *__restrict data_ptr;
-    if (degree < 13)
+    if (degree < 27)
       data_ptr = my_array;
     else
       {
