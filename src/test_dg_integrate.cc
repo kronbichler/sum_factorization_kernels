@@ -23,8 +23,13 @@ typedef double value_type;
 
 template <int dim, int degree, typename Number>
 void run_program(const unsigned int vector_size_guess,
-                 const unsigned int n_tests)
+                 const unsigned int n_tests,
+                 const unsigned int variants)
 {
+  // currently only degrees 3 and higher implemented
+  if (degree < 3)
+    return;
+
   int rank = 0;
   int n_procs = 1;
   //MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -142,101 +147,108 @@ void run_program(const unsigned int vector_size_guess,
                  << std::endl;
     }
 
-  best_avg = std::numeric_limits<double>::max();
-
-  for (unsigned int i=0; i<5; ++i)
-    {
-      //MPI_Barrier(MPI_COMM_WORLD);
-
-      struct timeval wall_timer;
-      gettimeofday(&wall_timer, NULL);
-      double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
-
-      for (unsigned int t=0; t<n_tests; ++t)
-        evaluator.do_chebyshev();
-
-      gettimeofday(&wall_timer, NULL);
-      double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
-
-      double min_time = compute_time, max_time = compute_time, avg_time = compute_time;
-      //MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-      //MPI_Allreduce(&compute_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-      //MPI_Allreduce(&compute_time, &avg_time, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
-      best_avg = std::min(best_avg, avg_time/n_procs);
-    }
-  if (rank == 0)
-    {
-      const std::size_t mem_transfer = global_size * sizeof(Number) *
-        6 * n_tests;
-      const std::size_t ops_interpolate = (/*add*/2*((degree+1)/2)*2 +
-                                           /*mult*/degree+1 +
-                                           /*fma*/2*((degree-1)*(degree+1)/2));
-      const std::size_t ops_approx = global_size / evaluator.dofs_per_cell
-        * (4 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
-           + 2 * dim * 2 * Utilities::pow(degree+1,dim-1)
-           + 2*dim * 4 * ops_interpolate * Utilities::pow(degree+1,dim-2)
-           + 2*dim * 2 * (degree+1 + 2*(degree+1) + 4) * Utilities::pow(degree+1,dim-1) +
-           + 2*dim*12 + (2*dim+5) * Utilities::pow(degree+1,dim)) * n_tests;
-      std::cout << "CH degree " << std::setw(2) << degree << "  ";
-      for (unsigned int d=0; d<dim; ++d)
-        std::cout << n_cells[d] << (d<dim-1 ? " x " : "");
-      std::cout << " elem " << evaluator.dofs_per_cell << ", block sizes: "
-                << evaluator.blx*VectorizedArray<Number>::n_array_elements
-                << " x " << evaluator.bly;
-      if (dim==3)
-        std::cout << " x " << evaluator.blz;
-      std::cout  << ", MDoFs/s: "
-                 << global_size * n_tests / best_avg/1e6 << ", GB/s: "
-                 << (double)mem_transfer/best_avg*1e-9 << " GFLOP/s: "
-                 << (double)ops_approx/best_avg*1e-9
-                 << std::endl;
-    }
-  best_avg = std::numeric_limits<double>::max();
-  for (unsigned int i=0; i<5; ++i)
-    {
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      struct timeval wall_timer;
-      gettimeofday(&wall_timer, NULL);
-      double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
-
-      for (unsigned int t=0; t<n_tests; ++t)
-        evaluator.emulate_cheby_vector_updates();
-
-      gettimeofday(&wall_timer, NULL);
-      double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
-
-      double min_time = -1, max_time = -1, avg_time = -1;
-      MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-      MPI_Allreduce(&compute_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-      MPI_Allreduce(&compute_time, &avg_time, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
-      best_avg = std::min(best_avg, avg_time/n_procs);
-    }
-  if (rank == 0)
-    {
-      const std::size_t mem = global_size * sizeof(Number) *
-        7 * n_tests;
-      const std::size_t ops = global_size * n_tests * 6;
-      std::cout << "VU degree " << std::setw(2) << degree << "  ";
-      for (unsigned int d=0; d<dim; ++d)
-        std::cout << n_cells[d] << (d<dim-1 ? " x " : "");
-      std::cout << " elem " << evaluator.dofs_per_cell << ", block sizes: "
-                << evaluator.blx*VectorizedArray<Number>::n_array_elements
-                << " x " << evaluator.bly;
-      if (dim==3)
-        std::cout << " x " << evaluator.blz;
-      std::cout  << ", MDoFs/s: "
-                 << global_size * n_tests / best_avg/1e6 << ", GB/s: "
-                 << (double)mem/best_avg*1e-9 << " GFLOP/s: "
-                 << (double)ops/best_avg*1e-9
-                 << std::endl;
-    }
-
 #ifdef DO_BLOCK_SIZE_TEST
       }
 #endif
+
+  if (variants > 1)
+    {
+      best_avg = std::numeric_limits<double>::max();
+
+      for (unsigned int i=0; i<5; ++i)
+        {
+          //MPI_Barrier(MPI_COMM_WORLD);
+
+          struct timeval wall_timer;
+          gettimeofday(&wall_timer, NULL);
+          double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
+
+          for (unsigned int t=0; t<n_tests; ++t)
+            evaluator.do_chebyshev();
+
+          gettimeofday(&wall_timer, NULL);
+          double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+
+          double min_time = compute_time, max_time = compute_time, avg_time = compute_time;
+          //MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+          //MPI_Allreduce(&compute_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+          //MPI_Allreduce(&compute_time, &avg_time, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+          best_avg = std::min(best_avg, avg_time/n_procs);
+        }
+      if (rank == 0)
+        {
+          const std::size_t mem_transfer = global_size * sizeof(Number) *
+            6 * n_tests;
+          const std::size_t ops_interpolate = (/*add*/2*((degree+1)/2)*2 +
+                                               /*mult*/degree+1 +
+                                               /*fma*/2*((degree-1)*(degree+1)/2));
+          const std::size_t ops_approx = global_size / evaluator.dofs_per_cell
+            * (4 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
+               + 2 * dim * 2 * Utilities::pow(degree+1,dim-1)
+               + 2*dim * 4 * ops_interpolate * Utilities::pow(degree+1,dim-2)
+               + 2*dim * 2 * (degree+1 + 2*(degree+1) + 4) * Utilities::pow(degree+1,dim-1) +
+               + 2*dim*12 + (2*dim+5) * Utilities::pow(degree+1,dim)) * n_tests;
+          std::cout << "CH degree " << std::setw(2) << degree << "  ";
+          for (unsigned int d=0; d<dim; ++d)
+            std::cout << n_cells[d] << (d<dim-1 ? " x " : "");
+          std::cout << " elem " << evaluator.dofs_per_cell << ", block sizes: "
+                    << evaluator.blx*VectorizedArray<Number>::n_array_elements
+                    << " x " << evaluator.bly;
+          if (dim==3)
+            std::cout << " x " << evaluator.blz;
+          std::cout  << ", MDoFs/s: "
+                     << global_size * n_tests / best_avg/1e6 << ", GB/s: "
+                     << (double)mem_transfer/best_avg*1e-9 << " GFLOP/s: "
+                     << (double)ops_approx/best_avg*1e-9
+                     << std::endl;
+        }
+    }
+
+  if (variants > 2)
+    {
+      best_avg = std::numeric_limits<double>::max();
+      for (unsigned int i=0; i<5; ++i)
+        {
+          //MPI_Barrier(MPI_COMM_WORLD);
+
+          struct timeval wall_timer;
+          gettimeofday(&wall_timer, NULL);
+          double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
+
+          for (unsigned int t=0; t<n_tests; ++t)
+            evaluator.emulate_cheby_vector_updates();
+
+          gettimeofday(&wall_timer, NULL);
+          double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+
+          double min_time = compute_time, max_time = compute_time, avg_time = compute_time;
+          //MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+          //MPI_Allreduce(&compute_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+          //MPI_Allreduce(&compute_time, &avg_time, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+          best_avg = std::min(best_avg, avg_time/n_procs);
+        }
+      if (rank == 0)
+        {
+          const std::size_t mem = global_size * sizeof(Number) *
+            7 * n_tests;
+          const std::size_t ops = global_size * n_tests * 6;
+          std::cout << "VU degree " << std::setw(2) << degree << "  ";
+          for (unsigned int d=0; d<dim; ++d)
+            std::cout << n_cells[d] << (d<dim-1 ? " x " : "");
+          std::cout << " elem " << evaluator.dofs_per_cell << ", block sizes: "
+                    << evaluator.blx*VectorizedArray<Number>::n_array_elements
+                    << " x " << evaluator.bly;
+          if (dim==3)
+            std::cout << " x " << evaluator.blz;
+          std::cout  << ", MDoFs/s: "
+                     << global_size * n_tests / best_avg/1e6 << ", GB/s: "
+                     << (double)mem/best_avg*1e-9 << " GFLOP/s: "
+                     << (double)ops/best_avg*1e-9
+                     << std::endl;
+        }
+    }
 }
 
 
@@ -244,13 +256,16 @@ template<int dim, int degree, int max_degree, typename Number>
 class RunTime
 {
 public:
-  static void run(const unsigned int vector_size_guess,
-                  const unsigned int n_tests)
+  static void run(const int          target_degree,
+                  const unsigned int vector_size_guess,
+                  const unsigned int n_tests,
+                  const unsigned int variants)
   {
-    run_program<dim,degree,Number>(vector_size_guess, n_tests);
+    if (degree == target_degree || target_degree == -1)
+      run_program<dim,degree,Number>(vector_size_guess, n_tests, variants);
     if (degree<max_degree)
       RunTime<dim,(degree<max_degree?degree+1:degree),max_degree,Number>
-              ::run(vector_size_guess, n_tests);
+              ::run(target_degree, vector_size_guess, n_tests, variants);
   }
 };
 
@@ -274,16 +289,21 @@ int main(int argc, char** argv)
   std::cout << "Number of threads: " << nthreads << std::endl;
   std::cout << "SIMD width:        "
             << sizeof(VectorizedArray<value_type>)/sizeof(value_type) << std::endl;
+  int degree                     = 4;
   std::size_t  vector_size_guess = 10000000;
   unsigned int n_tests           = 100;
+  unsigned int variants          = 2;
   if (argc > 1)
-    vector_size_guess = std::atoi(argv[1]);
+    degree = std::atoi(argv[1]);
   if (argc > 2)
-    n_tests = std::atoi(argv[2]);
+    vector_size_guess = std::atoi(argv[2]);
+  if (argc > 3)
+    n_tests = std::atoi(argv[3]);
+  if (argc > 4)
+    variants = std::atoi(argv[4]);
 
-  RunTime<dimension,min_degree,max_degree,value_type>::run(vector_size_guess, n_tests);
-  //run_program<dimension,3,value_type>(vector_size_guess, n_tests);
-  //run_program<dimension,6,value_type>(vector_size_guess, n_tests);
+  RunTime<dimension,min_degree,max_degree,value_type>::run(degree, vector_size_guess,
+                                                           n_tests, variants);
 
   //MPI_Finalize();
 
