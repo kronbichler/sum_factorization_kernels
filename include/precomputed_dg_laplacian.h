@@ -144,7 +144,7 @@ public:
             const VectorizedArray<Number> *__restrict in = src_array + i1*N;
             VectorizedArray<Number> *__restrict out = array_0 + i1*N;
 
-            apply_1d_matvec_kernel<N, 1, 2, true, false, Number>(laplace_1d_eo, in, out);
+            apply_1d_matvec_kernel<N, 1, 2, true, false, VectorizedArray<Number>>(laplace_1d_eo, in, out);
 
             VectorizedArray<Number> val1, val2;
             val1.gather(input_array.begin()+(N*(i1+1)-1)*n_lanes, indices_left);
@@ -176,7 +176,7 @@ public:
             VectorizedArray<Number> *__restrict out = array_1 + i1*N*N;
             for (unsigned int i2=0; i2<N; ++i2)
               {
-                apply_1d_matvec_kernel<N, N, 2, true, false, Number>(laplace_1d_eo, in+i2,
+                apply_1d_matvec_kernel<N, N, 2, true, false, VectorizedArray<Number>>(laplace_1d_eo, in+i2,
                                                                      out+i2);
 
                 VectorizedArray<Number> val1, val2;
@@ -210,7 +210,7 @@ public:
                 const VectorizedArray<Number> *__restrict in = src_array + i1;
                 VectorizedArray<Number> *__restrict out = array_2 + i1;
 
-                apply_1d_matvec_kernel<N, N*N, 2, true, false, Number>(laplace_1d_eo, in, out);
+                apply_1d_matvec_kernel<N, N*N, 2, true, false, VectorizedArray<Number>>(laplace_1d_eo, in, out);
 
                 VectorizedArray<Number> val1, val2;
                 val1.load(input_array.begin()+index_left+(N*N*(N-1)+i1)*n_lanes);
@@ -231,28 +231,28 @@ public:
           {
             // z mass matrices
             for (int i1=0; i1<N*N; ++i1)
-              apply_1d_matvec_kernel<N, N*N, 2, true, false, Number>(mass_1d_eo,
+              apply_1d_matvec_kernel<N, N*N, 2, true, false, VectorizedArray<Number>>(mass_1d_eo,
                                                                      array_0+i1, array_0+i1);
             for (int i1=0; i1<N*N; ++i1)
-              apply_1d_matvec_kernel<N, N*N, 2, true, false, Number>(mass_1d_eo,
+              apply_1d_matvec_kernel<N, N*N, 2, true, false, VectorizedArray<Number>>(mass_1d_eo,
                                                                      array_1+i1, array_1+i1);
 
             for (int i1=0; i1<N; ++i1)
               {
                 // y mass matrices
                 for (int i2=0; i2<N; ++i2)
-                  apply_1d_matvec_kernel<N, N, 2, true, false, Number>(mass_1d_eo,
+                  apply_1d_matvec_kernel<N, N, 2, true, false, VectorizedArray<Number>>(mass_1d_eo,
                                                                        array_0+i1*N*N+i2,
                                                                        array_0+i1*N*N+i2);
                 for (int i2=0; i2<N; ++i2)
-                  apply_1d_matvec_kernel<N, N, 2, true, true, Number>(mass_1d_eo,
+                  apply_1d_matvec_kernel<N, N, 2, true, true, VectorizedArray<Number>>(mass_1d_eo,
                                                                       array_2+i1*N*N+i2,
                                                                       array_1+i1*N*N+i2,
                                                                       array_1+i1*N*N+i2);
 
                 // x mass matrix
                 for (int i2=0; i2<N; ++i2)
-                  apply_1d_matvec_kernel<N, 1, 2, true, true, Number,/*NT store = */ true>
+                  apply_1d_matvec_kernel<N, 1, 2, true, true, VectorizedArray<Number>, VectorizedArray<Number>,/*NT store = */ true>
                     (mass_1d_eo, array_1+i1*N*N+i2*N,
                      dst_array+i1*N*N+i2*N, array_0+i1*N*N+i2*N);
               }
@@ -261,12 +261,12 @@ public:
           {
             // y mass matrix
             for (int i1=0; i1<N; ++i1)
-              apply_1d_matvec_kernel<N, N, 2, true, false, Number>(mass_1d_eo, array_1+i1,
+              apply_1d_matvec_kernel<N, N, 2, true, false, VectorizedArray<Number>>(mass_1d_eo, array_1+i1,
                                                                    array_1+i1);
 
             // x mass matrix
             for (int i1=0; i1<N; ++i1)
-              apply_1d_matvec_kernel<N, 1, 2, true, true, Number, /*NT store = */ true>
+              apply_1d_matvec_kernel<N, 1, 2, true, true, VectorizedArray<Number>, VectorizedArray<Number>, /*NT store = */ true>
                 (mass_1d_eo, array_0 + i1*N, dst_array+i1*N, array_1 + i1*N);
           }
         else

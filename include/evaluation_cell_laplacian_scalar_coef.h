@@ -8,8 +8,8 @@
 //
 // Author: Martin Kronbichler, May 2017
 
-#ifndef evaluation_cell_laplacian_h
-#define evaluation_cell_laplacian_h
+#ifndef evaluation_cell_laplacian_scalar_coef_h
+#define evaluation_cell_laplacian_scalar_coef_h
 
 #include "gauss_formula.h"
 #include "lagrange_polynomials.h"
@@ -22,6 +22,8 @@
 //#define DO_MASS_MATRIX
 //#define DO_CONVECTION
 #define READ_SINGLE_VECTOR
+
+#include "/home/kronbichler/sw/include/iacaMarks.h"
 
 template <int dim, int degree, typename Number>
 class EvaluationCellLaplacian
@@ -230,6 +232,7 @@ public:
 #else
           input_array.begin()+vector_offsets[cell];
 #endif
+          //IACA_START
 
         // --------------------------------------------------------------------
         // apply tensor product kernels
@@ -239,13 +242,13 @@ public:
             VectorizedArray<Number> *__restrict in = data_ptr + i2*nn*nn;
             for (unsigned int i1=0; i1<nn; ++i1)
               {
-                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>, Number>
                   (shape_values, input_ptr+i1*nn, in+i1*nn);
               }
             // y-direction
             for (unsigned int i1=0; i1<nn; ++i1)
               {
-                apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
+                apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>, Number>
                   (shape_values, in+i1, in+i1);
               }
             input_ptr += nn*nn;
@@ -255,7 +258,7 @@ public:
         if (dim == 3)
           for (unsigned int i1 = 0; i1<nn*nn_3d; ++i1)
             {
-              apply_1d_matvec_kernel<nn, nn*nn, 0, true, false, VectorizedArray<Number>>
+              apply_1d_matvec_kernel<nn, nn*nn, 0, true, false, VectorizedArray<Number>, Number>
                 (shape_values, data_ptr+i1, data_ptr+i1);
 #ifdef DO_MASS_MATRIX
             }
@@ -310,7 +313,7 @@ public:
 #else
               VectorizedArray<Number> *__restrict outz = data_ptr + i1 + dofs_per_cell;
               // z-derivative
-              apply_1d_matvec_kernel<nn, nn*nn, 1, true, false, VectorizedArray<Number>>
+              apply_1d_matvec_kernel<nn, nn*nn, 1, true, false, VectorizedArray<Number>, Number>
                 (shape_gradients, data_ptr+i1, outz);
             }
 
@@ -334,7 +337,7 @@ public:
             // y-derivative
             for (unsigned int i1=0; i1<nn; ++i1) // loop over x layers
               {
-                apply_1d_matvec_kernel<nn, nn, 1, true, false, VectorizedArray<Number>>
+                apply_1d_matvec_kernel<nn, nn, 1, true, false, VectorizedArray<Number>, Number>
                   (shape_gradients, in+i1, outy+i1);
               }
 
@@ -342,7 +345,7 @@ public:
             for (unsigned int i1=0; i1<nn; ++i1) // loop over y layers
               {
                 VectorizedArray<Number> outx[nn];
-                apply_1d_matvec_kernel<nn, 1, 1, true, false, VectorizedArray<Number>>
+                apply_1d_matvec_kernel<nn, 1, 1, true, false, VectorizedArray<Number>, Number>
                   (shape_gradients, in+i1*nn, outx);
 
                 // operations on quadrature points
@@ -406,14 +409,14 @@ public:
 
 
                 // x-derivative
-                apply_1d_matvec_kernel<nn, 1, 1, false, false, VectorizedArray<Number>>
+                apply_1d_matvec_kernel<nn, 1, 1, false, false, VectorizedArray<Number>, Number>
                   (shape_gradients, outx, in + i1*nn);
               } // end of loop over y layers
 
             // y-derivative
             for (unsigned int i1=0; i1<nn; ++i1) // loop over x layers
               {
-                apply_1d_matvec_kernel<nn, nn, 1, false, true, VectorizedArray<Number>>
+                apply_1d_matvec_kernel<nn, nn, 1, false, true, VectorizedArray<Number>, Number>
                   (shape_gradients, outy+i1, in + i1, in + i1);
               }
           } // end of loop over z layers
@@ -425,12 +428,12 @@ public:
               // z-derivative
               VectorizedArray<Number> *__restrict inz = data_ptr + i1 + dofs_per_cell;
               VectorizedArray<Number> *__restrict out = data_ptr + i1;
-              apply_1d_matvec_kernel<nn, nn*nn, 1, false, true, VectorizedArray<Number>>
+              apply_1d_matvec_kernel<nn, nn*nn, 1, false, true, VectorizedArray<Number>, Number>
                 (shape_gradients, inz, out, out);
 #endif // ifdef DO_MASS, else case
 
               // z-values
-              apply_1d_matvec_kernel<nn, nn*nn, 0, false, false, VectorizedArray<Number>>
+              apply_1d_matvec_kernel<nn, nn*nn, 0, false, false, VectorizedArray<Number>, Number>
                   (shape_values, out, out);
             }
 
@@ -446,17 +449,18 @@ public:
             // y-direction
             for (unsigned int i1=0; i1<nn; ++i1)
               {
-                apply_1d_matvec_kernel<nn, nn, 0, false, false, VectorizedArray<Number>>
+                apply_1d_matvec_kernel<nn, nn, 0, false, false, VectorizedArray<Number>, Number>
                   (shape_values, in+i1, in+i1);
               }
             // x-direction
             for (unsigned int i1=0; i1<nn; ++i1)
               {
-                apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>, Number>
                   (shape_values, in+i1*nn, output_ptr+i1*nn);
               }
             output_ptr += nn*nn;
           }
+        //IACA_END
       }
 #endif
   }
@@ -530,8 +534,8 @@ private:
       throw;
   }
 
-  AlignedVector<VectorizedArray<Number> > shape_values;
-  AlignedVector<VectorizedArray<Number> > shape_gradients;
+  AlignedVector<Number> shape_values;
+  AlignedVector<Number> shape_gradients;
 
   AlignedVector<Number> quadrature_weights;
 

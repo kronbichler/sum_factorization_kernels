@@ -170,13 +170,13 @@ public:
             VectorizedArray<Number> *__restrict in = data_ptr + i2*nn*nn;
             for (unsigned int i1=0; i1<nn; ++i1)
               {
-                apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, src_array+i2*nn*nn+i1*nn, in+i1*nn);
               }
             // y-direction
             for (unsigned int i1=0; i1<nn; ++i1)
               {
-                apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, in+i1, in+i1);
               }
           }
@@ -207,18 +207,18 @@ public:
 
                 // interpolate values onto quadrature points
                 for (unsigned int i1=0; i1<nn; ++i1)
-                  apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
                     (shape_values_eo, array_f[f]+i1*nn, array_f[f]+i1*nn);
                 for (unsigned int i1=0; i1<nn; ++i1)
-                  apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
                     (shape_values_eo, array_f[f]+i1, array_f[f]+i1);
 
                 // interpolate derivatives onto quadrature points
                 for (unsigned int i1=0; i1<nn; ++i1)
-                  apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
                     (shape_values_eo, array_fd[f]+i1*nn, array_fd[f]+i1*nn);
                 for (unsigned int i1=0; i1<nn; ++i1)
-                  apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
                     (shape_values_eo, array_fd[f]+i1, array_fd[f]+i1);
               }
 
@@ -226,12 +226,12 @@ public:
             const VectorizedArray<Number> JxW_face = my_jxw * inv_jac[2];
             for (unsigned int i2=0; i2<dofs_per_face; ++i2)
               {
-                apply_1d_matvec_kernel<degree+1,dofs_per_face,0,true,false,Number>
+                apply_1d_matvec_kernel<degree+1,dofs_per_face,0,true,false,VectorizedArray<Number>>
                   (shape_values_eo, data_ptr+i2, data_ptr+i2);
 
                 // include evaluation from this cell onto face
                 VectorizedArray<Number> array_face[4];
-                apply_1d_matvec_kernel<degree+1,dofs_per_face,1,true,false,Number,false,2>
+                apply_1d_matvec_kernel<degree+1,dofs_per_face,1,true,false,VectorizedArray<Number>,VectorizedArray<Number>,false,2>
                   (shape_gradients_eo, data_ptr+i2, data_ptr+dofs_per_cell+i2,
                    nullptr, shape_values_on_face_eo.begin(), array_face);
 
@@ -289,18 +289,18 @@ public:
 
               // interpolate values onto quadrature points
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
-                apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, array_f[f]+i1*nn, array_f[f]+i1*nn);
               for (unsigned int i1=0; i1<(dim==3 ? nn : 0); ++i1)
-                apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, array_f[f]+i1, array_f[f]+i1);
 
               // interpolate derivatives onto quadrature points
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
-                apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, array_fd[f]+i1*nn, array_fd[f]+i1*nn);
               for (unsigned int i1=0; i1<(dim==3 ? nn : 0); ++i1)
-                apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, array_fd[f]+i1, array_fd[f]+i1);
             }
         }
@@ -333,18 +333,18 @@ public:
 
               // interpolate values onto quadrature points
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
-                apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, array_f[f]+i1*nn, array_f[f]+i1*nn);
               for (unsigned int i1=0; i1<(dim==3 ? nn : 0); ++i1)
-                apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, array_f[f]+i1, array_f[f]+i1);
 
               // interpolate derivatives onto quadrature points
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
-                apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, array_fd[f]+i1*nn, array_fd[f]+i1*nn);
               for (unsigned int i1=0; i1<(dim==3 ? nn : 0); ++i1)
-                apply_1d_matvec_kernel<nn, nn, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, array_fd[f]+i1, array_fd[f]+i1);
             }
         }
@@ -366,7 +366,7 @@ public:
               {
                 const unsigned int i1 = i2*(degree+1)+i;
                 VectorizedArray<Number> array_face[4];
-                apply_1d_matvec_kernel<degree+1,degree+1,1,true,false,Number,false,2>
+                apply_1d_matvec_kernel<degree+1,degree+1,1,true,false,VectorizedArray<Number>,VectorizedArray<Number>,false,2>
                   (shape_gradients_eo, array_ptr+i, array_1+i,
                    nullptr, shape_values_on_face_eo.begin(), array_face);
 
@@ -389,7 +389,7 @@ public:
                   array_fd[3][i1] = (-0.5 * inv_jac[1] * JxW_facey) * jump * weight;
                 }
 
-                apply_1d_matvec_kernel<degree+1,1,1,true,false,Number,false,2>
+                apply_1d_matvec_kernel<degree+1,1,1,true,false,VectorizedArray<Number>,VectorizedArray<Number>,false,2>
                   (shape_gradients_eo, array_ptr+i*(degree+1), array_0+i*(degree+1),
                    nullptr, shape_values_on_face_eo.begin(), array_face);
 
@@ -429,9 +429,9 @@ public:
                 array_face[2] = array_fd[0][i1]+array_fd[1][i1];
                 array_face[3] = array_fd[0][i1]-array_fd[1][i1];
 #ifdef ONLY_CELL_TERMS
-                apply_1d_matvec_kernel<degree+1,1,1,false,false,Number,false,0>
+                apply_1d_matvec_kernel<degree+1,1,1,false,false,VectorizedArray<Number>,VectorizedArray<Number>,false,0>
 #else
-                apply_1d_matvec_kernel<degree+1,1,1,false,false,Number,false,2>
+                apply_1d_matvec_kernel<degree+1,1,1,false,false,VectorizedArray<Number>,VectorizedArray<Number>,false,2>
 #endif
                   (shape_gradients_eo, array_0+i*(degree+1), array_ptr+i*(degree+1),
                    nullptr, shape_values_on_face_eo.begin(), array_face);
@@ -445,9 +445,9 @@ public:
                 array_face[2] = array_fd[2][i1]+array_fd[3][i1];
                 array_face[3] = array_fd[2][i1]-array_fd[3][i1];
 #ifdef ONLY_CELL_TERMS
-                apply_1d_matvec_kernel<degree+1,degree+1,1,false,true,Number,false,0>
+                apply_1d_matvec_kernel<degree+1,degree+1,1,false,true,VectorizedArray<Number>,VectorizedArray<Number>,false,0>
 #else
-                apply_1d_matvec_kernel<degree+1,degree+1,1,false,true,Number,false,2>
+                apply_1d_matvec_kernel<degree+1,degree+1,1,false,true,VectorizedArray<Number>,VectorizedArray<Number>,false,2>
 #endif
                   (shape_gradients_eo, array_1+i, array_ptr+i,
                    array_ptr+i, shape_values_on_face_eo.begin(), array_face);
@@ -463,14 +463,14 @@ public:
                 array_face[2] = array_fd[4][i2]+array_fd[5][i2];
                 array_face[3] = array_fd[4][i2]-array_fd[5][i2];
 #ifdef ONLY_CELL_TERMS
-                apply_1d_matvec_kernel<degree+1,dofs_per_face,1,false,true,Number,false,0>
+                apply_1d_matvec_kernel<degree+1,dofs_per_face,1,false,true,VectorizedArray<Number>,VectorizedArray<Number>,false,0>
 #else
-                apply_1d_matvec_kernel<degree+1,dofs_per_face,1,false,true,Number,false,2>
+                apply_1d_matvec_kernel<degree+1,dofs_per_face,1,false,true,VectorizedArray<Number>,VectorizedArray<Number>,false,2>
 #endif
                   (shape_gradients_eo, data_ptr+dofs_per_cell+i2,
                    data_ptr+i2, data_ptr+i2, shape_values_on_face_eo.begin(), array_face);
 
-                apply_1d_matvec_kernel<degree+1,dofs_per_face,0,false,false,Number>
+                apply_1d_matvec_kernel<degree+1,dofs_per_face,0,false,false,VectorizedArray<Number>>
                   (shape_values_eo, data_ptr+i2, data_ptr+i2);
               }
           }
@@ -481,14 +481,14 @@ public:
             // y-direction
             for (unsigned int i1=0; i1<nn; ++i1)
               {
-                apply_1d_matvec_kernel<nn, nn, 0, false, false, Number>
+                apply_1d_matvec_kernel<nn, nn, 0, false, false, VectorizedArray<Number>>
                   (shape_values_eo, data_ptr+offset+i1, data_ptr+offset+i1);
               }
             // x-direction
             VectorizedArray<Number> *__restrict in = data_ptr + i2*nn*nn;
             for (unsigned int i1=0; i1<nn; ++i1)
               {
-                apply_1d_matvec_kernel<nn, 1, 0, true, false, Number>
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
                   (shape_values_eo, data_ptr+offset+i1*nn, data_ptr+offset+i1*nn);
 
                 if (evaluate_chebyshev)

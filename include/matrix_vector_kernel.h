@@ -32,20 +32,20 @@
 
 
 template <int nn, int stride, int type, bool contract_over_rows, bool add_into,
-          typename Number, bool nontemporal_store=false, int do_dg = 0>
+          typename Number, typename Number2=Number, bool nontemporal_store=false, int do_dg = 0>
 inline ALWAYS_INLINE
 void
-apply_1d_matvec_kernel(const AlignedVector<VectorizedArray<Number> >& coefficients,
-                       const VectorizedArray<Number>* in,
-                       VectorizedArray<Number>* out,
-                       const VectorizedArray<Number>* array_for_add = nullptr,
-                       const VectorizedArray<Number>* __restrict dg_coefficients = nullptr,
-                       VectorizedArray<Number>* array_face = nullptr)
+apply_1d_matvec_kernel(const AlignedVector<Number2>& coefficients,
+                       const Number* in,
+                       Number* out,
+                       const Number* array_for_add = nullptr,
+                       const Number2* __restrict dg_coefficients = nullptr,
+                       Number* array_face = nullptr)
 {
-  const VectorizedArray<Number> *__restrict coefficients_eo = coefficients.begin();
+  const Number2 *__restrict coefficients_eo = coefficients.begin();
   const unsigned int mid = nn/2;
   const unsigned int offset = (nn+1)/2;
-  VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
+  Number xp[mid>0?mid:1], xm[mid>0?mid:1];
   for (unsigned int i=0; i<mid; ++i)
     {
       if (contract_over_rows == true && type == 1)
@@ -62,12 +62,12 @@ apply_1d_matvec_kernel(const AlignedVector<VectorizedArray<Number> >& coefficien
 
   static_assert(do_dg == 0 || type==1, "Not implemented");
 
-  VectorizedArray<Number> xmid = in[stride*mid];
+  Number xmid = in[stride*mid];
   if (contract_over_rows == true)
     {
       for (unsigned int col=0; col<mid; ++col)
         {
-          VectorizedArray<Number> r0, r1;
+          Number r0, r1;
           r0 = coefficients_eo[col]                 * xp[0];
           r1 = coefficients_eo[(nn-1)*offset + col] * xm[0];
 
@@ -84,7 +84,7 @@ apply_1d_matvec_kernel(const AlignedVector<VectorizedArray<Number> >& coefficien
                 r0 += coefficients_eo[mid*offset+col] * xmid;
             }
 
-          VectorizedArray<Number> t = r0;
+          Number t = r0;
           r0 = (add_into ? array_for_add[col*stride] + t : t) + r1;
           r1 = (add_into ? array_for_add[(nn-1-col)*stride] + t : t) - r1;
           if (nontemporal_store == false)
@@ -100,9 +100,9 @@ apply_1d_matvec_kernel(const AlignedVector<VectorizedArray<Number> >& coefficien
         }
       if (nn % 2 == 1)
         {
-          VectorizedArray<Number> r0 = (add_into ?
-                                        array_for_add[mid] + coefficients_eo[mid*offset+mid] * xmid :
-                                        coefficients_eo[mid*offset+mid]*xmid);
+          Number r0 = (add_into ?
+                       array_for_add[mid] + coefficients_eo[mid*offset+mid] * xmid :
+                       coefficients_eo[mid*offset+mid]*xmid);
           for (unsigned int ind=0; ind<mid; ++ind)
             r0 += coefficients_eo[ind*offset+mid] * xp[ind];
 
@@ -113,8 +113,8 @@ apply_1d_matvec_kernel(const AlignedVector<VectorizedArray<Number> >& coefficien
         }
       if (do_dg > 0)
         {
-          VectorizedArray<Number> r0 = dg_coefficients[0] * xm[0];
-          VectorizedArray<Number> r1 = dg_coefficients[nn-1] * xp[0];
+          Number r0 = dg_coefficients[0] * xm[0];
+          Number r1 = dg_coefficients[nn-1] * xp[0];
           for (unsigned int ind=1; ind<mid; ++ind)
             {
               r0 += dg_coefficients[ind] * xm[ind];
@@ -127,8 +127,8 @@ apply_1d_matvec_kernel(const AlignedVector<VectorizedArray<Number> >& coefficien
         }
       if (do_dg>1)
         {
-          VectorizedArray<Number> r0 = dg_coefficients[nn] * xp[0];
-          VectorizedArray<Number> r1 = dg_coefficients[nn+nn-1] * xm[0];
+          Number r0 = dg_coefficients[nn] * xp[0];
+          Number r1 = dg_coefficients[nn+nn-1] * xm[0];
           for (unsigned int ind=1; ind<mid; ++ind)
             {
               r0 += dg_coefficients[nn+ind] * xp[ind];
@@ -144,8 +144,8 @@ apply_1d_matvec_kernel(const AlignedVector<VectorizedArray<Number> >& coefficien
     {
       for (unsigned int col=0; col<mid; ++col)
         {
-          VectorizedArray<Number> r0 = coefficients_eo[col*offset]        * xp[0];
-          VectorizedArray<Number> r1 = coefficients_eo[(nn-1-col)*offset] * xm[0];
+          Number r0 = coefficients_eo[col*offset]        * xp[0];
+          Number r1 = coefficients_eo[(nn-1-col)*offset] * xm[0];
 
           for (unsigned int ind=1; ind<mid; ++ind)
             {
@@ -167,7 +167,7 @@ apply_1d_matvec_kernel(const AlignedVector<VectorizedArray<Number> >& coefficien
               r1 += dg_coefficients[nn+nn-1-col] * array_face[3];
             }
 
-          VectorizedArray<Number> t = r0;
+          Number t = r0;
           r0 = (add_into ? array_for_add[col*stride] + t : t) + r1;
           if (type != 1)
             r1 = (add_into ? array_for_add[(nn-1-col)*stride] + t : t) - r1;
@@ -186,13 +186,13 @@ apply_1d_matvec_kernel(const AlignedVector<VectorizedArray<Number> >& coefficien
         }
       if (nn % 2 == 1)
         {
-          VectorizedArray<Number> r0 = (add_into ?
-                                        array_for_add[mid*stride] + coefficients_eo[mid*offset+mid] * xmid :
-                                        coefficients_eo[mid*offset+mid]*xmid);
+          Number r0 = (add_into ?
+                       array_for_add[mid*stride] + coefficients_eo[mid*offset+mid] * xmid :
+                       coefficients_eo[mid*offset+mid]*xmid);
           if (type == 1 && add_into)
             r0 = array_for_add[mid*stride];
           else if (type == 1)
-            r0 = VectorizedArray<Number>();
+            r0 = Number();
 
           if (type == 1)
             for (unsigned int ind=0; ind<mid; ++ind)
