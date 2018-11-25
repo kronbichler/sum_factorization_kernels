@@ -711,8 +711,6 @@ private:
 
   VectorizedArray<Number> hermite_derivative_on_face;
 
-  Number value_outer_1, value_outer_2;
-
   AlignedVector<Number> sol_old;
   AlignedVector<Number> sol_new;
   AlignedVector<Number> sol_rhs;

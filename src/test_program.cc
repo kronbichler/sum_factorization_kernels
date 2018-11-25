@@ -5,7 +5,13 @@
 #include <omp.h>
 #include <chrono>
 
+#define DO_FACES
+
+#ifdef DO_FACES
+#include "evaluation_cell_face_laplacian.h"
+#else
 #include "evaluation_cell_laplacian.h"
+#endif
 
 #ifdef LIKWID_PERFMON
 #include <likwid.h>
@@ -36,6 +42,21 @@ void run_program(const unsigned int n_tests)
     evaluator.initialize(n_cell_batches, cartesian);
     evaluator.do_verification();
   }
+
+  const std::size_t n_dofs = (std::size_t)n_cell_batches * Utilities::pow(degree+1,dim) * VectorizedArray<Number>::n_array_elements * omp_get_max_threads();
+  const std::size_t ops_interpolate = (/*add*/2*((degree+1)/2)*2 +
+                                       /*mult*/degree+1 +
+                                       /*fma*/2*((degree-1)*(degree+1)/2));
+  const std::size_t ops_approx = (std::size_t)n_cell_batches * VectorizedArray<Number>::n_array_elements * omp_get_max_threads()
+    * (4 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
+       + dim * 2 * dim * Utilities::pow(degree+1,dim)
+#ifdef DO_FACES
+       + dim * (3*(dim-1)*2*2*ops_interpolate * Utilities::pow(degree+1,dim-2)
+                + (2*2+2*3)*Utilities::pow(degree+1,dim-1)
+                + (4*dim-1+2+4+1+2+3*2*dim+3)*Utilities::pow(degree+1,dim-1)
+#endif
+                )
+       );
 
   for (unsigned int i=0; i<3; ++i)
     {
@@ -96,14 +117,7 @@ void run_program(const unsigned int n_tests)
           tavg += avg_time[i] / nthreads;
           stddev = std::max(stddev, std_dev[i]);
         }
-      const std::size_t n_dofs = (std::size_t)n_cell_batches * Utilities::pow(degree+1,dim) * VectorizedArray<Number>::n_array_elements * omp_get_max_threads();
       std::cout << "p" << degree << " statistics tall  ";
-      const std::size_t ops_interpolate = (/*add*/2*((degree+1)/2)*2 +
-                                           /*mult*/degree+1 +
-                                           /*fma*/2*((degree-1)*(degree+1)/2));
-      const std::size_t ops_approx = (std::size_t)n_cell_batches * VectorizedArray<Number>::n_array_elements * omp_get_max_threads()
-        * (4 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
-           + dim * 2 * dim * Utilities::pow(degree+1,dim));
       std::cout << std::setw(12) << tavg
                 << "  dev " << std::setw(12) << stddev
                 << "  min " << std::setw(12) << tmin
@@ -113,6 +127,11 @@ void run_program(const unsigned int n_tests)
                 << std::endl << std::endl;
       best_avg = std::min(tavg, best_avg);
     }
+  std::cout << "Best result p " << degree
+            << " --- DoFs/s " << std::setw(12) << n_dofs/best_avg
+            << "  GFlops/s " << std::setw(12) << 1e-9*ops_approx/best_avg
+            << "  ops/dof  " << (double)ops_approx/n_dofs
+            << std::endl;
 }
 
 
