@@ -5,13 +5,7 @@
 #include <omp.h>
 #include <chrono>
 
-#define DO_FACES
-
-#ifdef DO_FACES
-#include "evaluation_cell_face_laplacian.h"
-#else
 #include "evaluation_cell_laplacian.h"
-#endif
 
 #ifdef LIKWID_PERFMON
 #include <likwid.h>
@@ -19,6 +13,7 @@
 
 const unsigned int min_degree = 1;
 const unsigned int max_degree = 25;
+const unsigned int dimension = 3;
 
 const std::size_t  vector_size_guess = 50000;
 const bool         cartesian         = true;
@@ -48,14 +43,25 @@ void run_program(const unsigned int n_tests)
                                        /*mult*/degree+1 +
                                        /*fma*/2*((degree-1)*(degree+1)/2));
   const std::size_t ops_approx = (std::size_t)n_cell_batches * VectorizedArray<Number>::n_array_elements * omp_get_max_threads()
-    * (4 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
+    * (
+#ifdef DO_CONVECTION
+       3 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
+       + (dim+1) * Utilities::pow(degree+1,dim)
+#ifdef DO_FACES
+       + dim * ((dim-1)*2*2*ops_interpolate * Utilities::pow(degree+1,dim-2)
+                + (2*dim-1+7+2+1)*Utilities::pow(degree+1,dim-1)
+                )
+#endif
+#else
+       4 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
        + dim * 2 * dim * Utilities::pow(degree+1,dim)
 #ifdef DO_FACES
        + dim * (3*(dim-1)*2*2*ops_interpolate * Utilities::pow(degree+1,dim-2)
                 + (2*2+2*3)*Utilities::pow(degree+1,dim-1)
                 + (4*dim-1+2+4+1+2+3*2*dim+3)*Utilities::pow(degree+1,dim-1)
-#endif
                 )
+#endif
+#endif
        );
 
   for (unsigned int i=0; i<3; ++i)
@@ -168,8 +174,7 @@ int main(int argc, char** argv)
   if (argc > 1)
     degree = std::atoi(argv[1]);
 
-  //RunTime<2,min_degree,max_degree,value_type>::run();
-  RunTime<2,min_degree,max_degree,value_type>::run(degree, n_tests);
+  RunTime<dimension,min_degree,max_degree,value_type>::run(degree, n_tests);
 
 #ifdef LIKWID_PERFMON
   LIKWID_MARKER_CLOSE;

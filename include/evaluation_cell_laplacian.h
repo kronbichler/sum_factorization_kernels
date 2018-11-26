@@ -19,6 +19,7 @@
 #include "matrix_vector_kernel.h"
 
 //#define COPY_ONLY_BENCHMARK
+#define DO_FACES
 //#define DO_MASS_MATRIX
 //#define DO_CONVECTION
 #define READ_SINGLE_VECTOR
@@ -54,11 +55,14 @@ public:
       {
         jxw_data.resize(1);
         jxw_data[0] = jacobian_determinant;
-        jacobian_data.resize(dim);
+        jacobian_data.resize(dim*(dim+1)/2);
         for (unsigned int d=0; d<dim; ++d)
           jacobian_data[d] = jacobian[d];
         for (unsigned int i=0; i<n_element_batches; ++i)
           data_offsets[i] = 0;
+        convection.resize(dim);
+        for (unsigned int d=0; d<dim; ++d)
+          convection[d] = d+1;
       }
     else
       {
@@ -75,9 +79,26 @@ public:
                 jacobian_data[data_offsets[i]*dim*dim+
                               q*dim*dim+d*dim+d] = jacobian[d];
           }
+        std::abort();
       }
 
-    convection.resize(dim*dofs_per_cell*(is_cartesian ? 1 : n_element_batches));
+    for (unsigned int d=0; d<dim; ++d)
+      {
+        for (unsigned int e=0; e<dim; ++e)
+          {
+            normal_jac1[d][e] = VectorizedArray<Number>();
+            normal_jac2[d][e] = VectorizedArray<Number>();
+            normal_vector[d][e] = VectorizedArray<Number>();
+          }
+        normal_jac1[d][dim-1] = jacobian[d];
+        normal_jac2[d][dim-1] = jacobian[d];
+        normal_vector[d][d] = 1;
+        Number determinant = 1;
+        for (unsigned int e=0; e<dim; ++e)
+          if (d!=e)
+            determinant *= jacobian[e];
+        face_jxw[d] = 1./determinant;
+      }
   }
 
   std::size_t n_elements() const
@@ -87,6 +108,17 @@ public:
 
   void do_verification()
   {
+#ifdef DO_FACES
+    // no full verification implemented
+    for (unsigned int i=0; i<dofs_per_cell; ++i)
+      input_array[i] = Number(i);
+    matrix_vector_product();
+    Number sum = 0.;
+    for (unsigned int i=0; i<dofs_per_cell; ++i)
+      sum += output_array[i][0];
+    if (!std::isfinite(sum))
+      std::cout << "Wrong value: " << sum << std::endl;
+#else
     // check that the Laplacian applied to a linear function in all of the
     // directions equals to the value of the linear function at the boundary.
     std::vector<double> points = get_gauss_lobatto_points(degree+1);
@@ -179,6 +211,7 @@ public:
         std::cout << "Error of integral in direction " << test << ": "
                   << max_error << std::endl;
       }
+#endif
   }
 
   void matrix_vector_product()
@@ -221,6 +254,11 @@ public:
     const unsigned int nn_3d = dim==3 ? degree+1 : 1;
     const unsigned int mid = nn/2;
     const unsigned int offset = (nn+1)/2;
+
+#ifdef DO_FACES
+    constexpr unsigned int dofs_per_face = Utilities::pow(degree+1,dim-1);
+    VectorizedArray<Number> tmp1[2*dofs_per_face], tmp2[dim*dofs_per_face], tmp3[dim*dofs_per_face], tmp4[dofs_per_face], tmp5[dofs_per_face];
+#endif
 
     for (unsigned int cell=0; cell<vector_offsets.size(); ++cell)
       {
@@ -288,13 +326,10 @@ public:
 
 #ifdef DO_CONVECTION
             }
-        const VectorizedArray<Number> *__restrict convection_ptr =
-          convection.begin() + (is_cartesian ? 0 : data_offsets[cell]*dim);
         for (unsigned int i2=0; i2<nn_3d; ++i2)  // loop over z layers
           {
             VectorizedArray<Number> *__restrict in = data_ptr + i2*nn*nn;
             VectorizedArray<Number> *__restrict outz = data_ptr + i2*nn*nn + dofs_per_cell;
-            const VectorizedArray<Number> *__restrict conv = convection_ptr + i2*nn*nn*dim;
             VectorizedArray<Number> outy[nn*nn];
             for (unsigned int i1=0; i1<nn; ++i1) // loop over y layers
               {
@@ -302,10 +337,11 @@ public:
                 VectorizedArray<Number> xp[mid>0?mid:1], xm[mid>0?mid:1];
                 for (unsigned int i=0; i<nn; ++i)
                   {
-                    outx[i] = in[i1*nn+i] * conv[dim*(i1*nn+i)];
-                    outy[i1*nn+i] = in[i1*nn+i] * conv[dim*(i1*nn+i)+1];
+                    const VectorizedArray<Number> res = in[i1*nn+i] * quadrature_weights[i2*nn*nn+i1*nn+i];
+                    outx[i] = res * convection[0];
+                    outy[i1*nn+i] = res * convection[1];
                     if (dim == 3)
-                      outz[i1*nn+i] = in[i1*nn+i] * conv[dim*(i1*nn+i)+2];
+                      outz[i1*nn+i] = res * convection[2];
                   }
 #else
               VectorizedArray<Number> *__restrict outz = data_ptr + i1 + dofs_per_cell;
@@ -457,8 +493,302 @@ public:
               }
             output_ptr += nn*nn;
           }
-      }
+
+#ifdef DO_FACES
+
+        input_ptr =
+#ifdef READ_SINGLE_VECTOR
+          input_array.begin();
+#else
+          input_array.begin()+vector_offsets[cell];
 #endif
+        output_ptr =
+#ifdef READ_SINGLE_VECTOR
+          output_array.begin();
+#else
+          output_array.begin()+vector_offsets[cell];
+#endif
+        for (unsigned int f=0; f<dim; ++f)
+          {
+            const unsigned int stride1 = Utilities::pow(degree+1,(f+1)%dim);
+            const unsigned int stride2 = Utilities::pow(degree+1,(f+2)%dim);
+            const unsigned int offset1 = Utilities::pow(degree+1,f%dim);
+#ifdef DO_CONVECTION
+            if (dim == 2)
+              {
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  tmp1[i1] = input_ptr[degree*offset1 + i1*stride1];
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                  (shape_values, tmp1, tmp4);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  tmp1[i1] = input_ptr[i1*stride1];
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                  (shape_values, tmp1, tmp5);
+              }
+            else
+              {
+                for (unsigned int i2=0; i2<degree+1; ++i2)
+                  for (unsigned int i1=0; i1<degree+1; ++i1)
+                    tmp1[i2*(degree+1)+i1] = input_ptr[degree*offset1 + i2*stride2 + i1*stride1];
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+i1*(degree+1), tmp4+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp4+i1, tmp4+i1);
+                for (unsigned int i2=0; i2<degree+1; ++i2)
+                  for (unsigned int i1=0; i1<degree+1; ++i1)
+                    tmp1[i2*(degree+1)+i1] = input_ptr[i2*stride2 + i1*stride1];
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+i1*(degree+1), tmp5+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp5+i1, tmp5+i1);
+               }
+            for (unsigned int q=0; q<Utilities::pow(degree+1,dim-1); ++q)
+              {
+                VectorizedArray<Number> normal_speed = normal_vector[f][0]*convection[0];
+                for (unsigned int d=1; d<dim; ++d)
+                  normal_speed += normal_vector[f][d]*convection[d];
+                VectorizedArray<Number> flux = 0.5*(normal_speed*(tmp4[q]+tmp5[q]) +
+                                                    std::abs(normal_speed) * (tmp4[q]-tmp5[q]));
+                const VectorizedArray<Number> weight = -face_quadrature_weight[q] * face_jxw[f];
+                tmp4[q] = flux*weight;
+                tmp5[q] = -(flux*weight);
+              }
+            if (dim==2)
+              {
+                apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                  (shape_values, tmp4, tmp1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  output_ptr[degree*offset1 + i1*stride1] += tmp1[i1];
+                apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                  (shape_values, tmp5, tmp1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  output_ptr[i1*stride1] += tmp1[i1];
+              }
+            else
+              {
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                    (shape_values, tmp4+i1*(degree+1), tmp1+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, false, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+i1, tmp1+i1);
+                for (unsigned int i2=0; i2<degree+1; ++i2)
+                  for (unsigned int i1=0; i1<degree+1; ++i1)
+                    output_ptr[degree*offset1 + i2*stride2+i1*stride1] += tmp1[i2*(degree+1)+i1];
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                    (shape_values, tmp5+i1*(degree+1), tmp1+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, false, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+i1, tmp1+i1);
+                for (unsigned int i2=0; i2<degree+1; ++i2)
+                  for (unsigned int i1=0; i1<degree+1; ++i1)
+                    output_ptr[i2*stride2+i1*stride1] += tmp1[i2*(degree+1)+i1];
+              }
+#else
+            if (dim == 2)
+              {
+                // right
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  {
+                    tmp1[i1] = input_ptr[degree*offset1 + i1*stride1];
+                    tmp1[i1+dofs_per_face] = hermite_derivative_on_face *
+                      (input_ptr[(degree-1)*offset1+i1*stride1]-tmp1[i1]);
+                  }
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                  (shape_values, tmp1+dofs_per_face, tmp2+dofs_per_face);
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                  (shape_values, tmp1, tmp4);
+                apply_1d_matvec_kernel<nn, 1, 1, true, false, VectorizedArray<Number>>
+                  (shape_gradients, tmp4, tmp2);
+
+                // left
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  {
+                    tmp1[i1] = input_ptr[i1*stride1];
+                    tmp1[i1+dofs_per_face] = hermite_derivative_on_face *
+                      (input_ptr[offset1+i1*stride1]-tmp1[i1]);
+                  }
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                  (shape_values, tmp1+dofs_per_face, tmp3+dofs_per_face);
+                apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                  (shape_values, tmp1, tmp5);
+                apply_1d_matvec_kernel<nn, 1, 1, true, false, VectorizedArray<Number>>
+                  (shape_gradients, tmp5, tmp3);
+              }
+            else
+              {
+                // right
+                for (unsigned int i2=0; i2<degree+1; ++i2)
+                  for (unsigned int i1=0; i1<degree+1; ++i1)
+                    {
+                      tmp1[i2*(degree+1)+i1] = input_ptr[degree*offset1 + i2*stride2 + i1*stride1];
+                      tmp1[i2*(degree+1)+i1+dofs_per_face] = hermite_derivative_on_face *
+                        (input_ptr[(degree-1)*offset1+i2*stride2+i1*stride1]-tmp1[i2*(degree+1)+i1]);
+                    }
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+dofs_per_face+i1*(degree+1), tmp2+2*dofs_per_face+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp2+2*dofs_per_face+i1, tmp2+2*dofs_per_face+i1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+i1*(degree+1), tmp4+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp4+i1, tmp4+i1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 1, true, false, VectorizedArray<Number>>
+                    (shape_gradients, tmp4+i1*(degree+1), tmp2+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 1, true, false, VectorizedArray<Number>>
+                    (shape_gradients, tmp4+i1, tmp2+dofs_per_face+i1);
+
+                // left
+                for (unsigned int i2=0; i2<degree+1; ++i2)
+                  for (unsigned int i1=0; i1<degree+1; ++i1)
+                    {
+                      tmp1[i2*(degree+1)+i1] = input_ptr[i2*stride2 + i1*stride1];
+                      tmp1[i2*(degree+1)+i1+dofs_per_face] = hermite_derivative_on_face *
+                        (input_ptr[offset1+i2*stride2+i1*stride1]-tmp1[i2*(degree+1)+i1]);
+                    }
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+i1*(degree+1), tmp5+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp5+i1, tmp5+i1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 1, true, false, VectorizedArray<Number>>
+                    (shape_gradients, tmp5+i1*(degree+1), tmp3+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 1, true, false, VectorizedArray<Number>>
+                    (shape_gradients, tmp5+i1, tmp3+dofs_per_face+i1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+dofs_per_face+i1*(degree+1), tmp3+2*dofs_per_face+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp3+2*dofs_per_face+i1, tmp3+2*dofs_per_face+i1);
+              }
+
+            // quadrature point operation
+            const VectorizedArray<Number> sigmaF = Number((degree+1)*(degree+1))*normal_jac1[f][dim-1];
+            for (unsigned int q=0; q<Utilities::pow(degree+1,dim-1); ++q)
+              {
+                VectorizedArray<Number> average_valgrad = tmp2[q] * normal_jac1[f][0];
+                for (unsigned int d=1; d<dim; ++d)
+                  average_valgrad += tmp2[q+d*dofs_per_face] * normal_jac1[f][d];
+                for (unsigned int d=0; d<dim; ++d)
+                  average_valgrad += tmp3[q+d*dofs_per_face] * normal_jac2[f][d];
+                VectorizedArray<Number> average_value = 0.5 * (tmp4[q] + tmp5[q]);
+                const VectorizedArray<Number> weight = -face_quadrature_weight[q] * face_jxw[f];
+                for (unsigned int d=0; d<dim; ++d)
+                  tmp2[q+d*dofs_per_face] = weight * normal_jac1[f][d] * average_value;
+                for (unsigned int d=0; d<dim; ++d)
+                  tmp3[q+d*dofs_per_face] = weight * normal_jac2[f][d] * average_value;
+                average_valgrad = weight * (average_value * 2. * sigmaF -
+                                            average_valgrad * 0.5);
+                tmp4[q] = -average_valgrad;
+                tmp5[q] = average_valgrad;
+              }
+
+            if (dim==2)
+              {
+                // right
+                apply_1d_matvec_kernel<nn, 1, 1, false, true, VectorizedArray<Number>>
+                  (shape_gradients, tmp2, tmp4, tmp4);
+                apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                  (shape_values, tmp4, tmp1);
+                apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                  (shape_values, tmp2+dofs_per_face, tmp1+dofs_per_face);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  {
+                    output_ptr[degree*offset1 + i1*stride1] += tmp1[i1] -
+                      tmp1[i1+dofs_per_face] * hermite_derivative_on_face;
+                    output_ptr[(degree-1)*offset1+i1*stride1] += hermite_derivative_on_face * tmp1[i1+dofs_per_face];
+                  }
+
+                // left
+                apply_1d_matvec_kernel<nn, 1, 1, false, true, VectorizedArray<Number>>
+                  (shape_gradients, tmp3, tmp5, tmp5);
+                apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                  (shape_values, tmp5, tmp1);
+                apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                  (shape_values, tmp3+dofs_per_face, tmp1+dofs_per_face);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  {
+                    output_ptr[i1*stride1] += tmp1[i1] -
+                      tmp1[i1+dofs_per_face] * hermite_derivative_on_face;
+                    output_ptr[offset1+i1*stride1] += hermite_derivative_on_face * tmp1[i1+dofs_per_face];
+                  }
+              }
+            else
+              {
+                // right
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 1, false, true, VectorizedArray<Number>>
+                    (shape_gradients, tmp2+i1*(degree+1), tmp4+i1*(degree+1), tmp4+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 1, false, true, VectorizedArray<Number>>
+                    (shape_gradients, tmp2+dofs_per_face+i1, tmp4+i1, tmp4+i1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                    (shape_values, tmp4+i1*(degree+1), tmp1+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, false, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+i1, tmp1+i1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp2+2*dofs_per_face+i1*(degree+1), tmp1+dofs_per_face+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+dofs_per_face+i1, tmp1+dofs_per_face+i1);
+                for (unsigned int i2=0; i2<degree+1; ++i2)
+                  for (unsigned int i1=0; i1<degree+1; ++i1)
+                    {
+                      output_ptr[degree*offset1 + i2*stride2+i1*stride1] += tmp1[i2*(degree+1)+i1] -
+                      tmp1[i2*(degree+1)+i1+dofs_per_face] * hermite_derivative_on_face;
+                      output_ptr[(degree-1)*offset1+i2*stride2+i1*stride1] += hermite_derivative_on_face * tmp1[i2*(degree+1)+i1+dofs_per_face];
+                    }
+
+                // left
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 1, false, true, VectorizedArray<Number>>
+                    (shape_gradients, tmp3+i1*(degree+1), tmp5+i1*(degree+1), tmp5+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 1, false, true, VectorizedArray<Number>>
+                    (shape_gradients, tmp3+dofs_per_face+i1, tmp5+i1, tmp5+i1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, false, false, VectorizedArray<Number>>
+                    (shape_values, tmp5+i1*(degree+1), tmp1+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, false, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+i1, tmp1+i1);
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp3+2*dofs_per_face+i1*(degree+1), tmp1+dofs_per_face+i1*(degree+1));
+                for (unsigned int i1=0; i1<degree+1; ++i1)
+                  apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
+                    (shape_values, tmp1+dofs_per_face+i1, tmp1+dofs_per_face+i1);
+                for (unsigned int i2=0; i2<degree+1; ++i2)
+                  for (unsigned int i1=0; i1<degree+1; ++i1)
+                    {
+                      output_ptr[i2*stride2+i1*stride1] += tmp1[i2*(degree+1)+i1] -
+                      tmp1[i2*(degree+1)+i1+dofs_per_face] * hermite_derivative_on_face;
+                      output_ptr[offset1+i2*stride2+i1*stride1] += hermite_derivative_on_face * tmp1[i2*(degree+1)+i1+dofs_per_face];
+                    }
+              }
+#endif // !CONVECTION
+          }
+#endif // DO_FACES
+      }
+#endif // COPY_ONLY_BENCHMARK
   }
 
 private:
@@ -481,20 +811,20 @@ private:
     shape_values.resize((degree+1)*stride);
     shape_gradients.resize((degree+1)*stride);
 
-    LagrangePolynomialBasis basis_gll(get_gauss_lobatto_points(degree+1));
+    HermiteLikePolynomialBasis basis(degree);
     std::vector<double> gauss_points(get_gauss_points(n_q_points_1d));
     for (unsigned int i=0; i<(degree+1)/2; ++i)
       for (unsigned int q=0; q<stride; ++q)
         {
-          const double p1 = basis_gll.value(i, gauss_points[q]);
-          const double p2 = basis_gll.value(i, gauss_points[n_q_points_1d-1-q]);
+          const double p1 = basis.value(i, gauss_points[q]);
+          const double p2 = basis.value(i, gauss_points[n_q_points_1d-1-q]);
           shape_values[i*stride+q] = 0.5 * (p1 + p2);
           shape_values[(degree-i)*stride+q] = 0.5 * (p1 - p2);
         }
     if (degree%2 == 0)
       for (unsigned int q=0; q<stride; ++q)
         shape_values[degree/2*stride+q] =
-          basis_gll.value(degree/2, gauss_points[q]);
+          basis.value(degree/2, gauss_points[q]);
 
     LagrangePolynomialBasis basis_gauss(get_gauss_points(degree+1));
     for (unsigned int i=0; i<(degree+1)/2; ++i)
@@ -509,6 +839,12 @@ private:
       for (unsigned int q=0; q<stride; ++q)
         shape_gradients[degree/2*stride+q] =
           basis_gauss.derivative(degree/2, gauss_points[q]);
+
+    hermite_derivative_on_face = basis.derivative(0, 0);
+    if (std::abs(hermite_derivative_on_face[0] + basis.derivative(1, 0)) > 1e-12)
+      std::cout << "Error, unexpected value of Hermite shape function derivative: "
+                << hermite_derivative_on_face[0] << " vs "
+                << basis.derivative(1, 0) << std::endl;
 
     // get quadrature weights
     std::vector<double> gauss_weight_1d = get_gauss_weights(n_q_points_1d);
@@ -528,12 +864,29 @@ private:
         quadrature_weights[q] = gauss_weight_1d[q];
     else
       throw;
+
+    face_quadrature_weight.resize(Utilities::pow(n_q_points_1d,dim-1));
+    if (dim == 3)
+      for (unsigned int q=0, y=0; y<n_q_points_1d; ++y)
+        for (unsigned int x=0; x<n_q_points_1d; ++x, ++q)
+          face_quadrature_weight[q] = gauss_weight_1d[y] * gauss_weight_1d[x];
+    else if (dim == 2)
+      for (unsigned int q=0; q<n_q_points_1d; ++q)
+        face_quadrature_weight[q] = gauss_weight_1d[q];
+    else
+      face_quadrature_weight[0] = 1.;
   }
 
   AlignedVector<VectorizedArray<Number> > shape_values;
   AlignedVector<VectorizedArray<Number> > shape_gradients;
 
+  std::array<std::array<VectorizedArray<Number>,dim>,dim> normal_jac1, normal_jac2, normal_vector;
+  std::array<VectorizedArray<Number>,dim> face_jxw;
+
   AlignedVector<Number> quadrature_weights;
+  AlignedVector<Number> face_quadrature_weight;
+
+  VectorizedArray<Number> hermite_derivative_on_face;
 
   AlignedVector<unsigned int> vector_offsets;
   AlignedVector<VectorizedArray<Number> > input_array;
