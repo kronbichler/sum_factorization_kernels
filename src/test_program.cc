@@ -5,7 +5,8 @@
 #include <omp.h>
 #include <chrono>
 
-#define ELE_BASED_LAPLACE
+//#define ELE_BASED_LAPLACE
+#define READ_VECTOR
 
 #ifdef ELE_BASED_ADVECT
 #define DO_CONVECTION
@@ -24,7 +25,11 @@ const unsigned int min_degree = 1;
 const unsigned int max_degree = 25;
 const unsigned int dimension  = 3;
 
+#ifdef READ_VECTOR
+const std::size_t  vector_size_guess = 50000000;
+#else
 const std::size_t  vector_size_guess = 50000;
+#endif
 const bool         cartesian         = true;
 
 typedef double value_type;
@@ -33,13 +38,14 @@ typedef double value_type;
 template <int dim, int degree, typename Number>
 void run_program(const unsigned int n_tests)
 {
-  const unsigned int n_cell_batches = (vector_size_guess+Utilities::pow(degree+1,dim+1)-1) / Utilities::pow(degree+1,dim+1);
-  double best_avg = std::numeric_limits<double>::max();
 #ifdef _OPENMP
   const unsigned int nthreads = omp_get_max_threads();
 #else
   const unsigned int nthreads = 1;
 #endif
+
+  const unsigned int n_cell_batches = (vector_size_guess/nthreads+Utilities::pow(degree+1,dim+1)-1) / Utilities::pow(degree+1,dim+1);
+  double best_avg = std::numeric_limits<double>::max();
 
   {
     EvaluationCellLaplacian<dim,degree,Number> evaluator;
@@ -101,7 +107,11 @@ void run_program(const unsigned int n_tests)
 
 #pragma omp for schedule(static)
         for (unsigned int thr=0; thr<nthreads; ++thr)
+#ifdef READ_VECTOR
+          for (unsigned int t=0; t<5; ++t)
+#else
           for (unsigned int t=0; t<500; ++t)
+#endif
             evaluator.matrix_vector_product();
 
 #pragma omp barrier
@@ -153,9 +163,12 @@ void run_program(const unsigned int n_tests)
                 << std::endl << std::endl;
       best_avg = std::min(tavg, best_avg);
     }
-  std::cout << "Best result p " << degree
+  std::cout << "Best result p" << degree
             << " --- DoFs/s " << std::setw(12) << n_dofs/best_avg
             << "  GFlops/s " << std::setw(12) << 1e-9*ops_approx/best_avg
+#ifdef READ_VECTOR
+            << "  GB/s " << std::setw(12) << 1e-9*3*sizeof(Number)*n_dofs/best_avg
+#endif
             << "  ops/dof  " << (double)ops_approx/n_dofs
             << std::endl;
 }

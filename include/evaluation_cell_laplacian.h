@@ -19,10 +19,9 @@
 #include "matrix_vector_kernel.h"
 
 //#define COPY_ONLY_BENCHMARK
-#define DO_FACES
+//#define DO_FACES
 //#define DO_MASS_MATRIX
 //#define DO_CONVECTION
-#define READ_SINGLE_VECTOR
 
 template <int dim, int degree, typename Number>
 class EvaluationCellLaplacian
@@ -170,7 +169,7 @@ public:
           if (d!=test)
             boundary_factor /= jacobian[d];
         double max_error = 0;
-#ifndef READ_SINGLE_VECTOR
+#ifdef READ_VECTOR
         for (unsigned int cell=0; cell<vector_offsets.size(); ++cell)
 #else
         unsigned int cell=0;
@@ -265,10 +264,10 @@ public:
     for (unsigned int cell=0; cell<vector_offsets.size(); ++cell)
       {
         const VectorizedArray<Number> *__restrict input_ptr =
-#ifdef READ_SINGLE_VECTOR
-          input_array.begin();
-#else
+#ifdef READ_VECTOR
           input_array.begin()+vector_offsets[cell];
+#else
+          input_array.begin();
 #endif
 
         // --------------------------------------------------------------------
@@ -480,10 +479,10 @@ public:
             }
 
         VectorizedArray<Number> *__restrict output_ptr =
-#ifdef READ_SINGLE_VECTOR
-          output_array.begin();
-#else
+#ifdef READ_VECTOR
           output_array.begin()+vector_offsets[cell];
+#else
+          output_array.begin();
 #endif
         for (unsigned int i2=0; i2<nn_3d; ++i2)
           {
@@ -506,16 +505,16 @@ public:
 #ifdef DO_FACES
 
         input_ptr =
-#ifdef READ_SINGLE_VECTOR
-          input_array.begin();
-#else
+#ifdef READ_VECTOR
           input_array.begin()+vector_offsets[cell];
+#else
+          input_array.begin();
 #endif
         output_ptr =
-#ifdef READ_SINGLE_VECTOR
-          output_array.begin();
-#else
+#ifdef READ_VECTOR
           output_array.begin()+vector_offsets[cell];
+#else
+          output_array.begin();
 #endif
         for (unsigned int f=0; f<dim; ++f)
           {
