@@ -102,6 +102,8 @@ public:
     constexpr unsigned int n_lanes = VectorizedArray<Number>::n_array_elements;
     constexpr unsigned int dofs_per_face = Utilities::pow(degree+1,dim-1);
     VectorizedArray<Number> array_0[dofs_per_cell], array_1[dofs_per_cell], array_2[dofs_per_cell];
+    const VectorizedArray<Number> *__restrict laplace_1d_eo = this->laplace_1d_eo.begin();
+    const VectorizedArray<Number> *__restrict mass_1d_eo = this->mass_1d_eo.begin();
 
     for (unsigned int ix=start_x; ix<end_x; ++ix)
       {

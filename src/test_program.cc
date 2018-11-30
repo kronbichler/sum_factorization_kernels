@@ -5,7 +5,16 @@
 #include <omp.h>
 #include <chrono>
 
+#define ELE_BASED_LAPLACE
+
+#ifdef ELE_BASED_ADVECT
+#define DO_CONVECTION
+#include "evaluation_dgele_advect.h"
+#elif defined(ELE_BASED_LAPLACE)
+#include "evaluation_dgele_laplacian.h"
+#else
 #include "evaluation_cell_laplacian.h"
+#endif
 
 #ifdef LIKWID_PERFMON
 #include <likwid.h>
@@ -13,7 +22,7 @@
 
 const unsigned int min_degree = 1;
 const unsigned int max_degree = 25;
-const unsigned int dimension = 3;
+const unsigned int dimension  = 3;
 
 const std::size_t  vector_size_guess = 50000;
 const bool         cartesian         = true;
@@ -47,10 +56,15 @@ void run_program(const unsigned int n_tests)
 #ifdef DO_CONVECTION
        3 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
        + (dim+1) * Utilities::pow(degree+1,dim)
-#ifdef DO_FACES
+#if defined(DO_FACES)
        + dim * ((dim-1)*2*2*ops_interpolate * Utilities::pow(degree+1,dim-2)
-                + (2*dim-1+7+2+1)*Utilities::pow(degree+1,dim-1)
+                + (6+2+1)*Utilities::pow(degree+1,dim-1)
                 )
+#elif defined (ELE_BASED_ADVECT)
+       + 2*dim * ((dim-1)*ops_interpolate * Utilities::pow(degree+1,dim-2)
+                  + (7)*Utilities::pow(degree+1,dim-1)
+                )
+       + 2*2* (degree-1 + 2*(degree+1) + 4) * Utilities::pow(degree+1,dim-1)
 #endif
 #else
        4 * dim * ops_interpolate * Utilities::pow(degree+1,dim-1)
@@ -60,6 +74,12 @@ void run_program(const unsigned int n_tests)
                 + (2*2+2*3)*Utilities::pow(degree+1,dim-1)
                 + (4*dim-1+2+4+1+2+3*2*dim+3)*Utilities::pow(degree+1,dim-1)
                 )
+#elif defined (ELE_BASED_LAPLACE)
+       + 2*dim * (5*(dim-1)*ops_interpolate * Utilities::pow(degree+1,dim-2)
+                  + (4*dim-1+2+2+3+2*dim)*Utilities::pow(degree+1,dim-1)
+                )
+       + 4*2* (degree+1 + 2*(degree-1) + 2) * Utilities::pow(degree+1,dim-1)
+       + 2*(dim-2)* (2*2) * Utilities::pow(degree+1,dim-1)
 #endif
 #endif
        );

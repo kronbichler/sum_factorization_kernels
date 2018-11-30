@@ -3,8 +3,8 @@
 // the Free Software Foundation; either version 2.1 of the License, or (at
 // your option) any later version.
 //
-// implementation of cell and face terms for DG Laplacian (interior penalty
-// method) using integration on Cartesian cell geometries with integration
+// implementation of cell and face terms for advection using integration on
+// Cartesian cell geometries with integration
 //
 // Author: Martin Kronbichler, April 2018
 
@@ -303,6 +303,9 @@ public:
     constexpr unsigned int n_lanes = VectorizedArray<Number>::n_array_elements;
     constexpr unsigned int dofs_per_face = Utilities::pow(degree+1,dim-1);
     constexpr unsigned int dofs_per_plane = Utilities::pow(degree+1,2);
+    const VectorizedArray<Number> *__restrict shape_values_eo = this->shape_values_eo.begin();
+    const VectorizedArray<Number> *__restrict inv_shape_values_eo = this->inv_shape_values_eo.begin();
+    const VectorizedArray<Number> *__restrict shape_gradients_eo = this->shape_gradients_eo.begin();
     AlignedVector<VectorizedArray<Number> > scratch_data_array;
     VectorizedArray<Number> my_array[degree < 13 ? 2*dofs_per_cell : 1];
     VectorizedArray<Number> *__restrict data_ptr;

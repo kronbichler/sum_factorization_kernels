@@ -234,6 +234,8 @@ public:
           output_ptr[i] += input_ptr[i] * jxw_data[0];
       }
 #else
+    const VectorizedArray<Number> *__restrict shape_values = this->shape_values.begin();
+    const VectorizedArray<Number> *__restrict shape_gradients = this->shape_gradients.begin();
     AlignedVector<VectorizedArray<Number> > scratch_data_array;
     VectorizedArray<Number> my_array[degree < 27 ? 2*dofs_per_cell : 1];
     VectorizedArray<Number> *__restrict data_ptr;
@@ -326,6 +328,13 @@ public:
 
 #ifdef DO_CONVECTION
             }
+        const VectorizedArray<Number> *__restrict jxw_ptr =
+          jxw_data.begin() + data_offsets[cell];
+        const VectorizedArray<Number> *__restrict jacobian_ptr =
+          jacobian_data.begin() + data_offsets[cell]*dim*dim;
+        for (unsigned int d=0; d<dim; ++d)
+          merged_array[d] = jxw_ptr[0] * jacobian_ptr[d] * convection[d];
+
         for (unsigned int i2=0; i2<nn_3d; ++i2)  // loop over z layers
           {
             VectorizedArray<Number> *__restrict in = data_ptr + i2*nn*nn;
@@ -338,10 +347,10 @@ public:
                 for (unsigned int i=0; i<nn; ++i)
                   {
                     const VectorizedArray<Number> res = in[i1*nn+i] * quadrature_weights[i2*nn*nn+i1*nn+i];
-                    outx[i] = res * convection[0];
-                    outy[i1*nn+i] = res * convection[1];
+                    outx[i] = res * merged_array[0];
+                    outy[i1*nn+i] = res * merged_array[1];
                     if (dim == 3)
-                      outz[i1*nn+i] = res * convection[2];
+                      outz[i1*nn+i] = res * merged_array[2];
                   }
 #else
               VectorizedArray<Number> *__restrict outz = data_ptr + i1 + dofs_per_cell;

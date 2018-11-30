@@ -141,6 +141,8 @@ public:
     constexpr unsigned int n_lanes = VectorizedArray<Number>::n_array_elements;
     constexpr unsigned int dofs_per_face = Utilities::pow(degree+1,dim-1);
     constexpr unsigned int dofs_per_plane = Utilities::pow(degree+1,2);
+    const VectorizedArray<Number> *__restrict shape_values_eo = this->shape_values_eo.begin();
+    const VectorizedArray<Number> *__restrict shape_gradients_eo = this->shape_gradients_eo.begin();
     AlignedVector<VectorizedArray<Number> > scratch_data_array;
     VectorizedArray<Number> my_array[degree < 13 ? 2*dofs_per_cell : 1];
     VectorizedArray<Number> *__restrict data_ptr;

@@ -35,14 +35,13 @@ template <int nn, int stride, int type, bool contract_over_rows, bool add_into,
           typename Number, typename Number2=Number, bool nontemporal_store=false, int do_dg = 0>
 inline ALWAYS_INLINE
 void
-apply_1d_matvec_kernel(const AlignedVector<Number2>& coefficients,
+apply_1d_matvec_kernel(const Number2 *__restrict coefficients_eo,
                        const Number* in,
                        Number* out,
                        const Number* array_for_add = nullptr,
                        const Number2* __restrict dg_coefficients = nullptr,
                        Number* array_face = nullptr)
 {
-  const Number2 *__restrict coefficients_eo = coefficients.begin();
   const unsigned int mid = nn/2;
   const unsigned int offset = (nn+1)/2;
   Number xp[mid>0?mid:1], xm[mid>0?mid:1];
