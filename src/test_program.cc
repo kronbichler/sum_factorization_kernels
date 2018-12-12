@@ -6,7 +6,7 @@
 #include <chrono>
 
 //#define ELE_BASED_LAPLACE
-#define READ_VECTOR
+//#define READ_VECTOR
 
 #ifdef ELE_BASED_ADVECT
 #define DO_CONVECTION
@@ -44,7 +44,13 @@ void run_program(const unsigned int n_tests)
   const unsigned int nthreads = 1;
 #endif
 
-  const unsigned int n_cell_batches = (vector_size_guess/nthreads+Utilities::pow(degree+1,dim+1)-1) / Utilities::pow(degree+1,dim+1);
+  const unsigned int n_cell_batches = (vector_size_guess/
+#ifdef READ_VECTOR
+                                       nthreads
+#else
+                                       1
+#endif
+                                       +Utilities::pow(degree+1,dim+1)-1) / Utilities::pow(degree+1,dim+1);
   double best_avg = std::numeric_limits<double>::max();
 
   {
