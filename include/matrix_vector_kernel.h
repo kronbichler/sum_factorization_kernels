@@ -26,10 +26,6 @@
 #ifndef matrix_vector_kernel_h
 #define matrix_vector_kernel_h
 
-#include "vectorization.h"
-#include "utilities.h"
-#include "aligned_vector.h"
-
 
 template <int nn, int stride, int type, bool contract_over_rows, bool add_into,
           typename Number, typename Number2=Number, bool nontemporal_store=false, int do_dg = 0>
