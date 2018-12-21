@@ -16,10 +16,10 @@
 
 #include "gauss_formula.h"
 #include "lagrange_polynomials.h"
-#include "matrix_vector_kernel.h"
 #include "vectorization.h"
 #include "aligned_vector.h"
 #include "utilities.h"
+#include "matrix_vector_kernel.h"
 
 #ifdef _OPENMP
 #include <omp.h>
