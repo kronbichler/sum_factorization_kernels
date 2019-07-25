@@ -321,6 +321,11 @@ public:
     for (unsigned int ix=start_x; ix<end_x; ++ix)
       {
         const unsigned int ii=((iz*n_cells[1]+iy)*n_cells[0]+ix)*n_lanes;
+
+        // stage (ii)(a)
+        //
+        // vector entries are stored contiguously -> simply
+        // set a pointer to the data
         const VectorizedArray<Number>* src_array =
           reinterpret_cast<const VectorizedArray<Number>*>(src.begin()+ii*dofs_per_cell);
         VectorizedArray<Number>* dst_array =
@@ -329,6 +334,9 @@ public:
         const VectorizedArray<Number> * inv_jac = jacobian_data.begin();
         const VectorizedArray<Number> my_jxw = jxw_data[0];
 
+        // stage (ii)(b), part 1
+        //
+        // interpolate in quadrature points
         for (unsigned int i2=0; i2<(dim>2 ? degree+1 : 1); ++i2)
           {
             // x-direction
@@ -346,6 +354,9 @@ public:
               }
           }
 
+        // stage (iii)
+        //
+        // loop range 4, 5
         if (dim == 3)
           {
             const unsigned int index[2] = {(iz > 0 ?
@@ -359,10 +370,13 @@ public:
 
             for (unsigned int f=4; f<6; ++f)
               {
+                // stage (iii)(a+)
                 const unsigned int offset1 = (f==4 ? dofs_per_face*degree : 0);
                 for (unsigned int i=0; i<dofs_per_face; ++i)
                   array_f[f][i].load(src.begin()+index[f%2]+(offset1+i)*n_lanes);
 
+                // stage (iii)(b+)
+                //
                 // interpolate values onto quadrature points
                 for (unsigned int i1=0; i1<nn; ++i1)
                   apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
@@ -375,10 +389,13 @@ public:
             const VectorizedArray<Number> JxW_face = my_jxw * inv_jac[2];
             for (unsigned int i2=0; i2<dofs_per_face; ++i2)
               {
+                // stage (ii)(b), part 2
                 apply_1d_matvec_kernel<degree+1,dofs_per_face,0,true,false,VectorizedArray<Number>>
                   (shape_values_eo, data_ptr+i2, data_ptr+i2);
 
-                // evaluation from cell onto face
+                // stage (iii)(b-)
+                //
+                // evaluation from cell into face
                 VectorizedArray<Number> r0 = shape_values_on_face_eo[0] * (data_ptr[i2]+
                                                                            data_ptr[i2+nn*nn*(nn-1)]);
                 VectorizedArray<Number> r1 = shape_values_on_face_eo[nn-1] * (data_ptr[i2]-
@@ -393,6 +410,8 @@ public:
                 if (nn%2 == 1)
                   r0 += shape_values_on_face_eo[mid] * data_ptr[i2+nn*nn*mid];
 
+                // stage (iii)(c)
+                //
                 // face integrals in z direction
                 {
                   const VectorizedArray<Number> normal_times_advection =
@@ -415,6 +434,12 @@ public:
               }
           }
 
+        // stage (iii)
+        //
+        // loop range 0, 1
+        //
+        // stage (iii)(a+)
+        //
         // interpolate external x values for faces
         {
           unsigned int indices[2*n_lanes];
@@ -440,6 +465,8 @@ public:
               for (unsigned int i=0; i<dofs_per_face; ++i)
                 array_f[f][i].gather(src.begin()+(offset1+i*(degree+1))*n_lanes, indices+f*n_lanes);
 
+              // stage (iii)(b+)
+              //
               // interpolate values onto quadrature points
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
                 apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
@@ -449,6 +476,12 @@ public:
                   (shape_values_eo, array_f[f]+i1, array_f[f]+i1);
             }
         }
+        // stage (iii)
+        //
+        // loop range 2, 3
+        //
+        // stage (iii)(a+)
+        //
         // interpolate external y values for faces
         {
           const unsigned int index[2] = {(iy > 0 ?
@@ -468,6 +501,8 @@ public:
                     array_f[f][i1*(degree+1)+i2].load(src.begin()+index[f%2]+(base_offset1+i2)*n_lanes);
                 }
 
+              // stage (iii)(b+)
+              //
               // interpolate values onto quadrature points
               for (unsigned int i1=0; i1<(dim==3 ? nn : 1); ++i1)
                 apply_1d_matvec_kernel<nn, 1, 0, true, false, VectorizedArray<Number>>
@@ -493,6 +528,12 @@ public:
               {
                 const unsigned int i1 = i2*(degree+1)+i;
                 const VectorizedArray<Number> weight = make_vectorized_array(face_quadrature_weight[i1]);
+                // stage (iii)
+                //
+                // loop range 2, 3
+                //
+                // stage (iii)(b-)
+                //
                 // evaluation from cell onto face
                 VectorizedArray<Number> r0 = shape_values_on_face_eo[0] * (array_ptr[i]+
                                                                            array_ptr[i+nn*(nn-1)]);
@@ -508,6 +549,8 @@ public:
                 if (nn%2 == 1)
                   r0 += shape_values_on_face_eo[mid] * array_ptr[i+nn*mid];
 
+                // stage (iii)(c)
+                //
                 // face integrals in y direction
                 {
                   const VectorizedArray<Number> normal_times_advection =
@@ -528,6 +571,12 @@ public:
                                            std::abs(normal_times_advection) * (u_minus-u_plus)) * JxW_facey * weight;
                 }
 
+                // stage (iii)
+                //
+                // loop range 0, 1
+                //
+                // stage (iii)(b-)
+                //
                 // evaluation from cell onto face
                 r0 = shape_values_on_face_eo[0] * (array_ptr[i*nn]+
                                                    array_ptr[i*nn+(nn-1)]);
@@ -543,6 +592,8 @@ public:
                 if (nn%2 == 1)
                   r0 += shape_values_on_face_eo[mid] * array_ptr[i*nn+mid];
 
+                // stage (iii)(c)
+                //
                 // face integrals in x direction
                 {
                   const VectorizedArray<Number> normal_times_advection =
@@ -564,6 +615,8 @@ public:
                 }
               }
 
+            // stage (ii)(c)
+            //
             // cell integral on quadrature points
             for (unsigned int q=0; q<dofs_per_plane; ++q)
               {
@@ -572,12 +625,15 @@ public:
                 if (dim>2)
                   array_2_ptr[q] = advection.data[2] * inv_jac[2]*(my_jxw*quadrature_ptr[q] * array_ptr[q]);
               }
+            // stage (iii)(d), loop range 0,1
             for (unsigned int i=0; i<degree+1; ++i)
               {
                 const unsigned int i1 = i2*(degree+1)+i;
                 VectorizedArray<Number> array_face[2];
                 array_face[0] = array_f[0][i1]+array_f[1][i1];
                 array_face[1] = array_f[0][i1]-array_f[1][i1];
+
+                // stage (ii)(d), part 0
 #ifdef ONLY_CELL_TERMS
                 apply_1d_matvec_kernel<degree+1,1,1,false,false,VectorizedArray<Number>,VectorizedArray<Number>,false,0>
 #else
@@ -586,12 +642,15 @@ public:
                   (shape_gradients_eo, array_0+i*(degree+1), array_ptr+i*(degree+1),
                    nullptr, shape_values_on_face_eo.begin(), array_face);
               }
+            // stage (iii)(d), loop range 2,3
             for (unsigned int i=0; i<degree+1; ++i)
               {
                 const unsigned int i1 = i2*(degree+1)+i;
                 VectorizedArray<Number> array_face[2];
                 array_face[0] = array_f[2][i1]+array_f[3][i1];
                 array_face[1] = array_f[2][i1]-array_f[3][i1];
+
+                // stage (ii)(d), part 1
 #ifdef ONLY_CELL_TERMS
                 apply_1d_matvec_kernel<degree+1,degree+1,1,false,true,VectorizedArray<Number>,VectorizedArray<Number>,false,0>
 #else
@@ -603,11 +662,14 @@ public:
           }
         if (dim == 3)
           {
+            // stage (iii)(d), loop range 4,5
             for (unsigned int i2=0; i2<dofs_per_face; ++i2)
               {
                 VectorizedArray<Number> array_face[2];
                 array_face[0] = array_f[4][i2]+array_f[5][i2];
                 array_face[1] = array_f[4][i2]-array_f[5][i2];
+
+                // stage (ii)(d), part 2
 #ifdef ONLY_CELL_TERMS
                 apply_1d_matvec_kernel<degree+1,dofs_per_face,1,false,true,VectorizedArray<Number>,VectorizedArray<Number>,false,0>
 #else
@@ -620,6 +682,7 @@ public:
                 for (unsigned int i=0; i<degree+1; ++i)
                   data_ptr[i2+i*nn*nn] /= my_jxw*quadrature_weights[i2+i*nn*nn];
 
+                // stage (ii)(d), part 3
                 apply_1d_matvec_kernel<degree+1,dofs_per_face,0,true,false,VectorizedArray<Number>>
                   (inv_shape_values_eo, data_ptr+i2, data_ptr+i2);
               }
@@ -634,12 +697,17 @@ public:
         for (unsigned int i2=0; i2< (dim>2 ? degree+1 : 1); ++i2)
           {
             const unsigned int offset = i2*dofs_per_plane;
+
+            // stage (ii)(d), part 4
+            //
             // y-direction
             for (unsigned int i1=0; i1<nn; ++i1)
               {
                 apply_1d_matvec_kernel<nn, nn, 0, true, false, VectorizedArray<Number>>
                   (inv_shape_values_eo, data_ptr+offset+i1, data_ptr+offset+i1);
               }
+            // stage (ii)(d), part 5
+            //
             // x-direction
             VectorizedArray<Number> *__restrict in = data_ptr + i2*nn*nn;
             for (unsigned int i1=0; i1<nn; ++i1)
@@ -648,6 +716,7 @@ public:
                   (inv_shape_values_eo, data_ptr+offset+i1*nn, data_ptr+offset+i1*nn);
 
 
+                // Section with additional code in case we do Runge-Kutta benchmark
                 if (evaluate_stage)
                   {
                     VectorizedArray<Number>* tmp_array =
@@ -667,6 +736,9 @@ public:
                   }
                 else
                   {
+                    // stage (ii)(e)
+                    //
+                    // Section for the "do_matvec()" benchmark
                     for (unsigned int i=0; i<degree+1; ++i)
                       data_ptr[offset+i1*nn+i].streaming_store(&dst_array[offset+i1*nn+i][0]);
                   }

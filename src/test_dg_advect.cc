@@ -81,28 +81,31 @@ void run_program(const unsigned int vector_size_guess,
     {
       MPI_Barrier(MPI_COMM_WORLD);
 
-      struct timeval wall_timer;
-      gettimeofday(&wall_timer, NULL);
-      double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
+      double min_time = 1e10, max_time = 0, avg_time = 0;
 
       for (unsigned int t=0; t<n_tests; ++t)
-        evaluator.do_time_step(simulation_time);
+        {
+          struct timeval wall_timer;
+          gettimeofday(&wall_timer, NULL);
+          double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
 
-      gettimeofday(&wall_timer, NULL);
-      double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+          // calls the loop in the Runge-Kutta setup
+          evaluator.do_time_step(simulation_time);
 
-      double min_time = -1, max_time = -1, avg_time = -1;
-      MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-      MPI_Allreduce(&compute_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-      MPI_Allreduce(&compute_time, &avg_time, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+          gettimeofday(&wall_timer, NULL);
+          double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+          min_time = std::min(min_time, compute_time);
+          max_time = std::max(max_time, compute_time);
+          avg_time += compute_time;
+        }
 
-      best_avg = std::min(best_avg, avg_time/n_procs);
+      best_avg = std::min(best_avg, avg_time);
       if (rank == 0)
         {
           std::cout << "Time for operation (min/avg/max): "
-                    << min_time/n_tests << " "
-                    << avg_time/n_procs/n_tests << " "
-                    << max_time/n_tests << " "
+                    << min_time << " "
+                    << avg_time/n_tests << " "
+                    << max_time << " "
                     << std::endl;
         }
     }
@@ -141,22 +144,33 @@ void run_program(const unsigned int vector_size_guess,
     {
       MPI_Barrier(MPI_COMM_WORLD);
 
-      struct timeval wall_timer;
-      gettimeofday(&wall_timer, NULL);
-      double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
+      double min_time = 1e10, max_time = 0, avg_time = 0;
 
       for (unsigned int t=0; t<n_tests; ++t)
-        evaluator.do_matvec();
+        {
+          struct timeval wall_timer;
+          gettimeofday(&wall_timer, NULL);
+          double start = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
 
-      gettimeofday(&wall_timer, NULL);
-      double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+          // calls the loop in the Runge-Kutta setup
+          evaluator.do_matvec();
 
-      double min_time = -1, max_time = -1, avg_time = -1;
-      MPI_Allreduce(&compute_time, &min_time, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-      MPI_Allreduce(&compute_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-      MPI_Allreduce(&compute_time, &avg_time, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+          gettimeofday(&wall_timer, NULL);
+          double compute_time = (wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec - start);
+          min_time = std::min(min_time, compute_time);
+          max_time = std::max(max_time, compute_time);
+          avg_time += compute_time;
+        }
 
-      best_avg = std::min(best_avg, avg_time/n_procs);
+      best_avg = std::min(best_avg, avg_time);
+      if (rank == 0)
+        {
+          std::cout << "Time for matrix-vector (min/avg/max): "
+                    << min_time << " "
+                    << avg_time/n_tests << " "
+                    << max_time << " "
+                    << std::endl;
+        }
     }
   if (rank == 0)
     {
@@ -195,12 +209,14 @@ class RunTime
 {
 public:
   static void run(const unsigned int vector_size_guess,
-                  const unsigned int n_tests)
+                  const unsigned int n_tests,
+                  const int          selected_degree)
   {
-    run_program<dim,degree,Number>(vector_size_guess, n_tests);
+    if (selected_degree == -1 || degree == selected_degree)
+      run_program<dim,degree,Number>(vector_size_guess, n_tests);
     if (degree<max_degree)
       RunTime<dim,(degree<max_degree?degree+1:degree),max_degree,Number>
-              ::run(vector_size_guess, n_tests);
+              ::run(vector_size_guess, n_tests, selected_degree);
   }
 };
 
@@ -226,14 +242,15 @@ int main(int argc, char** argv)
             << sizeof(VectorizedArray<value_type>)/sizeof(value_type) << std::endl;
   std::size_t  vector_size_guess = 10000000;
   unsigned int n_tests           = 100;
+  int degree                     = -1;
   if (argc > 1)
     vector_size_guess = std::atoi(argv[1]);
   if (argc > 2)
     n_tests = std::atoi(argv[2]);
+  if (argc > 3)
+    degree = std::atoi(argv[3]);
 
-  RunTime<dimension,min_degree,max_degree,value_type>::run(vector_size_guess, n_tests);
-  //run_program<dimension,3,value_type>(vector_size_guess, n_tests);
-  //run_program<dimension,6,value_type>(vector_size_guess, n_tests);
+  RunTime<dimension,min_degree,max_degree,value_type>::run(vector_size_guess, n_tests, degree);
 
   MPI_Finalize();
 
