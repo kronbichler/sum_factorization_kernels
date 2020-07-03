@@ -16,7 +16,7 @@
 #endif
 
 const unsigned int min_degree = 3;
-const unsigned int max_degree = 3;
+const unsigned int max_degree = 19;
 const unsigned int dimension = 3;
 typedef double value_type;
 //#define DO_BLOCK_SIZE_TEST
