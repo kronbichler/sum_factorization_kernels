@@ -11,7 +11,6 @@
 #ifndef evaluation_dg_laplacian_h
 #define evaluation_dg_laplacian_h
 
-#include <mpi.h>
 
 #include "gauss_formula.h"
 #include "lagrange_polynomials.h"
