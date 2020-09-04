@@ -29,6 +29,8 @@
 #endif
 
 
+#define IGNORE_NEIGHBOR_ACCESS
+
 
 template <int dim, int degree, typename Number>
 class PrecomputedDGLaplacian
@@ -148,6 +150,7 @@ public:
 
             apply_1d_matvec_kernel<N, 1, 2, true, false, VectorizedArray<Number>>(laplace_1d_eo, in, out);
 
+#ifndef IGNORE_NEIGHBOR_ACCESS
             VectorizedArray<Number> val1, val2;
             val1.gather(input_array.begin()+(N*(i1+1)-1)*n_lanes, indices_left);
             val2.gather(input_array.begin()+(N*(i1+1)-2)*n_lanes, indices_left);
@@ -160,6 +163,7 @@ public:
             out[N-1] += val1 * interface_val_0;
             out[N-1] += val2 * interface_val_1;
             out[N-2] += val1 * interface_val_1;
+#endif
           }
 
         // -------------------------------------------------------------
@@ -181,6 +185,7 @@ public:
                 apply_1d_matvec_kernel<N, N, 2, true, false, VectorizedArray<Number>>(laplace_1d_eo, in+i2,
                                                                      out+i2);
 
+#ifndef IGNORE_NEIGHBOR_ACCESS
                 VectorizedArray<Number> val1, val2;
                 val1.load(input_array.begin()+index_left+(i1*N*N+(N-1)*N+i2)*n_lanes);
                 val2.load(input_array.begin()+index_left+(i1*N*N+(N-2)*N+i2)*n_lanes);
@@ -192,6 +197,7 @@ public:
                 out[N*(N-1)+i2] += val1 * interface_val_0;
                 out[N*(N-1)+i2] += val2 * interface_val_1;
                 out[N*(N-2)+i2] += val1 * interface_val_1;
+#endif
               }
           }
 
@@ -214,6 +220,7 @@ public:
 
                 apply_1d_matvec_kernel<N, N*N, 2, true, false, VectorizedArray<Number>>(laplace_1d_eo, in, out);
 
+#ifndef IGNORE_NEIGHBOR_ACCESS
                 VectorizedArray<Number> val1, val2;
                 val1.load(input_array.begin()+index_left+(N*N*(N-1)+i1)*n_lanes);
                 val2.load(input_array.begin()+index_left+(N*N*(N-2)+i1)*n_lanes);
@@ -225,6 +232,7 @@ public:
                 out[N*N*(N-1)] += val1 * interface_val_0;
                 out[N*N*(N-1)] += val2 * interface_val_1;
                 out[N*N*(N-2)] += val1 * interface_val_1;
+#endif
               }
           }
 
