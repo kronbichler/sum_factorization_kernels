@@ -24,7 +24,9 @@
 #ifndef vectorization_h
 #define vectorization_h
 
+#ifdef __SSE2__
 #include <x86intrin.h>
+#endif
 #include <cstdlib>
 
 #ifndef USE_VECTOR_ARITHMETICS
