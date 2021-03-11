@@ -82,7 +82,7 @@ apply_1d_matvec_kernel(const Number2 *__restrict coefficients_eo,
           Number t = r0;
           r0 = (add_into ? array_for_add[col*stride] + t : t) + r1;
           r1 = (add_into ? array_for_add[(nn-1-col)*stride] + t : t) - r1;
-          if (nontemporal_store == false)
+          if constexpr (nontemporal_store == false)
             {
               out[col*stride]        = r0;
               out[(nn-1-col)*stride] = r1;
@@ -101,7 +101,7 @@ apply_1d_matvec_kernel(const Number2 *__restrict coefficients_eo,
           for (unsigned int ind=0; ind<mid; ++ind)
             r0 += coefficients_eo[ind*offset+mid] * xp[ind];
 
-          if (nontemporal_store == false)
+          if constexpr (nontemporal_store == false)
             out[mid*stride] = r0;
           else
             r0.streaming_store(&out[mid*stride][0]);
@@ -168,7 +168,7 @@ apply_1d_matvec_kernel(const Number2 *__restrict coefficients_eo,
             r1 = (add_into ? array_for_add[(nn-1-col)*stride] + t : t) - r1;
           else
             r1 = (add_into ? array_for_add[(nn-1-col)*stride] + r1 : r1) - t;
-          if (nontemporal_store == false)
+          if constexpr (nontemporal_store == false)
             {
               out[col*stride]        = r0;
               out[(nn-1-col)*stride] = r1;
@@ -202,7 +202,7 @@ apply_1d_matvec_kernel(const Number2 *__restrict coefficients_eo,
           if (do_dg > 1)
             r0 += dg_coefficients[nn+mid] * array_face[3];
 
-          if (nontemporal_store == false)
+          if constexpr (nontemporal_store == false)
             out[mid*stride] = r0;
           else
             r0.streaming_store(&out[mid*stride][0]);

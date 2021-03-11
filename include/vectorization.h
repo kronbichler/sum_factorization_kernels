@@ -190,6 +190,170 @@ vectorized_transpose_and_store(const bool                     add_into,
 }
 
 
+#if defined(__ARM_FEATURE_SVE)
+
+#include <arm_sve.h>
+
+/**
+ * Specialization of VectorizedArray class for double and AVX-512.
+ */
+template <>
+class alignas(64) VectorizedArray<double>
+{
+public:
+  /**
+   * This gives the number of vectors collected in this class.
+   */
+  static const unsigned int n_array_elements = 8;
+
+  VectorizedArray() = default;
+
+  /**
+   * Copy constructor.
+   */
+  VectorizedArray(const VectorizedArray &x)
+  {
+    const svfloat64_t t = svld1_f64(svptrue_b64(), x.data);
+    svst1_f64(svptrue_b64(), data, t);
+  }
+
+  /**
+   * Constructor from scalar.
+   */
+  VectorizedArray(const double x)
+  {
+    svst1_f64(svptrue_b64(), data, svdup_n_f64(x));
+  }
+
+  /**
+   * Copy operator.
+   */
+  VectorizedArray &
+  operator = (const VectorizedArray x)
+  {
+    const svfloat64_t t = svld1_f64(svptrue_b64(), x.data);
+    svst1_f64(svptrue_b64(), data, t);
+    return *this;
+  }
+
+  /**
+   * This function can be used to set all data fields to a given scalar.
+   */
+  VectorizedArray &
+  operator = (const double x)
+  {
+    svst1_f64(svptrue_b64(), data, svdup_n_f64(x));
+    return *this;
+  }
+
+  /**
+   * Access operator.
+   */
+  double &
+  operator [] (const unsigned int comp)
+  {
+    return data[comp];
+  }
+
+  /**
+   * Constant access operator.
+   */
+  const double &
+  operator [] (const unsigned int comp) const
+  {
+    return data[comp];
+  }
+
+  /**
+   * Addition.
+   */
+  VectorizedArray &
+  operator += (const VectorizedArray &vec)
+  {
+    const svfloat64_t t0 = svld1_f64(svptrue_b64(), data);
+    const svfloat64_t t1 = svld1_f64(svptrue_b64(), vec.data);
+    svst1_f64(svptrue_b64(), data, svadd_f64_z(svptrue_b64(), t0, t1));
+    return *this;
+  }
+
+  /**
+   * Subtraction.
+   */
+  VectorizedArray &
+  operator -= (const VectorizedArray &vec)
+  {
+    const svfloat64_t t0 = svld1_f64(svptrue_b64(), data);
+    const svfloat64_t t1 = svld1_f64(svptrue_b64(), vec.data);
+    svst1_f64(svptrue_b64(), data, svsub_f64_z(svptrue_b64(), t0, t1));
+    return *this;
+  }
+
+  /**
+   * Multiplication.
+   */
+  VectorizedArray &
+  operator *= (const VectorizedArray &vec)
+  {
+    const svfloat64_t t0 = svld1_f64(svptrue_b64(), data);
+    const svfloat64_t t1 = svld1_f64(svptrue_b64(), vec.data);
+    svst1_f64(svptrue_b64(), data, svmul_f64_z(svptrue_b64(), t0, t1));
+    return *this;
+  }
+
+  /**
+   * Division.
+   */
+  VectorizedArray &
+  operator /= (const VectorizedArray &vec)
+  {
+    const svfloat64_t t0 = svld1_f64(svptrue_b64(), data);
+    const svfloat64_t t1 = svld1_f64(svptrue_b64(), vec.data);
+    svst1_f64(svptrue_b64(), data, svdiv_f64_z(svptrue_b64(), t0, t1));
+    return *this;
+  }
+
+  void load (const double *ptr)
+  {
+    const svfloat64_t t = svld1_f64(svptrue_b64(), ptr);
+    svst1_f64(svptrue_b64(), data, t);
+  }
+
+  void store (double *ptr) const
+  {
+    const svfloat64_t t = svld1_f64(svptrue_b64(), data);
+    svst1_f64(svptrue_b64(), ptr, t);
+  }
+
+  void streaming_store (double *ptr) const
+  {
+    const svfloat64_t t = svld1_f64(svptrue_b64(), data);
+    // TODO
+    svst1_f64(svptrue_b64(), ptr, t);
+  }
+
+  void gather (const double       *base_ptr,
+               const unsigned int *offsets)
+  {
+    // TODO
+  }
+
+  void scatter (const unsigned int *offsets,
+                double             *base_ptr) const
+  {
+    // TODO
+  }
+
+  VectorizedArray get_abs () const
+  {
+    // TODO
+    return *this;
+  }
+
+  double data[8];
+};
+
+#endif
+
 #if defined(__AVX512F__)
 
 /**
