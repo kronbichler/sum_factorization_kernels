@@ -258,7 +258,7 @@ main(int argc, char **argv)
   }
 
   for (unsigned int i = 0; i < output.size(); ++i)
-    output[i] = 0;
+    output_vec[i] = 0;
   {
     double tmin = 1e10, tmax = 0, tavg = 0, variance = 0;
     for (unsigned int test = 0; test < 100; ++test)
