@@ -7,15 +7,17 @@
 //
 // Author: Martin Kronbichler, March 2021
 
-#include <cmath>
 #include <chrono>
+#include <cmath>
 #include <iomanip>
 
 #include "utilities.h"
+#include "vectorization.h"
+
+//
 
 #include "aligned_vector.h"
 #include "matrix_vector_kernel.h"
-#include "vectorization.h"
 
 
 template <typename Number, typename Number2 = Number>
@@ -50,7 +52,7 @@ test_low_level(const Number2 *__restrict matrix, const Number *input, Number *ou
       for (unsigned int k = 0; k < size; ++k)
         {
           const Number *         in     = input + l * size * size + k * size;
-          const Number *         out    = output + l * size * size + k * size;
+          Number *               out    = output + l * size * size + k * size;
           constexpr unsigned int stride = 1;
 
           svfloat64_t t0  = svld1_f64(svptrue_b64(), in[0].data);
@@ -84,6 +86,8 @@ test_low_level(const Number2 *__restrict matrix, const Number *input, Number *ou
           svfloat64_t c16 = svdup_n_f64(matrix[16]);
           svfloat64_t c17 = svdup_n_f64(matrix[17]);
 
+          svfloat64_t t2, t3, t4, t5;
+
           t0 = svmul_f64_z(svptrue_b64(), xp0, c00);
           t1 = svmul_f64_z(svptrue_b64(), xm0, c15);
           t2 = svmul_f64_z(svptrue_b64(), xp0, c01);
@@ -114,7 +118,7 @@ test_low_level(const Number2 *__restrict matrix, const Number *input, Number *ou
       for (unsigned int k = 0; k < size; ++k)
         {
           const Number *         in     = output + l * size * size + k;
-          const Number *         out    = output + l * size * size + k;
+          Number *               out    = output + l * size * size + k;
           constexpr unsigned int stride = size;
 
           svfloat64_t t0  = svld1_f64(svptrue_b64(), in[0].data);
