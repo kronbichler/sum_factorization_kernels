@@ -25,12 +25,12 @@
 #define vectorization_h
 
 #ifdef __SSE2__
-#include <x86intrin.h>
+#  include <x86intrin.h>
 #endif
 #include <cstdlib>
 
 #ifndef USE_VECTOR_ARITHMETICS
-#define USE_VECTOR_ARITHMETICS 1
+#  define USE_VECTOR_ARITHMETICS 1
 #endif
 
 template <typename Number>
@@ -46,7 +46,7 @@ public:
    * This function assigns a scalar to this class.
    */
   VectorizedArray &
-  operator = (const Number scalar)
+  operator=(const Number scalar)
   {
     data = scalar;
     return *this;
@@ -55,8 +55,7 @@ public:
   /**
    * Access operator (only valid with component 0)
    */
-  Number &
-  operator [] (const unsigned int)
+  Number &operator[](const unsigned int)
   {
     return data;
   }
@@ -64,8 +63,7 @@ public:
   /**
    * Constant access operator (only valid with component 0)
    */
-  const Number &
-  operator [] (const unsigned int) const
+  const Number &operator[](const unsigned int) const
   {
     return data;
   }
@@ -74,9 +72,9 @@ public:
    * Addition
    */
   VectorizedArray &
-  operator += (const VectorizedArray<Number> &vec)
+  operator+=(const VectorizedArray<Number> &vec)
   {
-    data+=vec.data;
+    data += vec.data;
     return *this;
   }
 
@@ -84,9 +82,9 @@ public:
    * Subtraction
    */
   VectorizedArray &
-  operator -= (const VectorizedArray<Number> &vec)
+  operator-=(const VectorizedArray<Number> &vec)
   {
-    data-=vec.data;
+    data -= vec.data;
     return *this;
   }
 
@@ -94,9 +92,9 @@ public:
    * Multiplication
    */
   VectorizedArray &
-  operator *= (const VectorizedArray<Number> &vec)
+  operator*=(const VectorizedArray<Number> &vec)
   {
-    data*=vec.data;
+    data *= vec.data;
     return *this;
   }
 
@@ -104,40 +102,44 @@ public:
    * Division
    */
   VectorizedArray &
-  operator /= (const VectorizedArray<Number> &vec)
+  operator/=(const VectorizedArray<Number> &vec)
   {
-    data/=vec.data;
+    data /= vec.data;
     return *this;
   }
 
-  void load (const Number *ptr)
+  void
+  load(const Number *ptr)
   {
     data = *ptr;
   }
 
-  void store (Number *ptr) const
+  void
+  store(Number *ptr) const
   {
     *ptr = data;
   }
 
-  void streaming_store (Number *ptr) const
+  void
+  streaming_store(Number *ptr) const
   {
     *ptr = data;
   }
 
-  void gather (const Number       *base_ptr,
-               const unsigned int *offsets)
+  void
+  gather(const Number *base_ptr, const unsigned int *offsets)
   {
     data = base_ptr[offsets[0]];
   }
 
-  void scatter (const unsigned int *offsets,
-                Number             *base_ptr) const
+  void
+  scatter(const unsigned int *offsets, Number *base_ptr) const
   {
     base_ptr[offsets[0]] = data;
   }
 
-  VectorizedArray get_abs () const
+  VectorizedArray
+  get_abs() const
   {
     VectorizedArray res;
     res.data = std::abs(data);
@@ -151,7 +153,7 @@ public:
 
 template <typename Number>
 VectorizedArray<Number>
-make_vectorized_array (const Number &u)
+make_vectorized_array(const Number &u)
 {
   VectorizedArray<Number> result;
   result = u;
@@ -159,40 +161,40 @@ make_vectorized_array (const Number &u)
 }
 
 template <typename Number>
-inline
-void
+inline void
 vectorized_load_and_transpose(const unsigned int       n_entries,
-                              const Number            *in,
-                              const unsigned int      *offsets,
+                              const Number *           in,
+                              const unsigned int *     offsets,
                               VectorizedArray<Number> *out)
 {
-  for (unsigned int i=0; i<n_entries; ++i)
-    for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
-      out[i][v] = in[offsets[v]+i];
+  for (unsigned int i = 0; i < n_entries; ++i)
+    for (unsigned int v = 0; v < VectorizedArray<Number>::n_array_elements; ++v)
+      out[i][v] = in[offsets[v] + i];
 }
 template <typename Number>
-inline
-void
+inline void
 vectorized_transpose_and_store(const bool                     add_into,
                                const unsigned int             n_entries,
                                const VectorizedArray<Number> *in,
-                               const unsigned int            *offsets,
-                               Number                        *out)
+                               const unsigned int *           offsets,
+                               Number *                       out)
 {
   if (add_into)
-    for (unsigned int i=0; i<n_entries; ++i)
-      for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
-        out[offsets[v]+i] += in[i][v];
+    for (unsigned int i = 0; i < n_entries; ++i)
+      for (unsigned int v = 0; v < VectorizedArray<Number>::n_array_elements;
+           ++v)
+        out[offsets[v] + i] += in[i][v];
   else
-    for (unsigned int i=0; i<n_entries; ++i)
-      for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
-        out[offsets[v]+i] = in[i][v];
+    for (unsigned int i = 0; i < n_entries; ++i)
+      for (unsigned int v = 0; v < VectorizedArray<Number>::n_array_elements;
+           ++v)
+        out[offsets[v] + i] = in[i][v];
 }
 
 
 #if defined(__ARM_FEATURE_SVE)
 
-#include <arm_sve.h>
+#  include <arm_sve.h>
 
 /**
  * Specialization of VectorizedArray class for double and AVX-512.
@@ -229,7 +231,7 @@ public:
    * Copy operator.
    */
   VectorizedArray &
-  operator = (const VectorizedArray x)
+  operator=(const VectorizedArray x)
   {
     const svfloat64_t t = svld1_f64(svptrue_b64(), x.data);
     svst1_f64(svptrue_b64(), data, t);
@@ -240,7 +242,7 @@ public:
    * This function can be used to set all data fields to a given scalar.
    */
   VectorizedArray &
-  operator = (const double x)
+  operator=(const double x)
   {
     svst1_f64(svptrue_b64(), data, svdup_n_f64(x));
     return *this;
@@ -249,8 +251,7 @@ public:
   /**
    * Access operator.
    */
-  double &
-  operator [] (const unsigned int comp)
+  double &operator[](const unsigned int comp)
   {
     return data[comp];
   }
@@ -258,8 +259,7 @@ public:
   /**
    * Constant access operator.
    */
-  const double &
-  operator [] (const unsigned int comp) const
+  const double &operator[](const unsigned int comp) const
   {
     return data[comp];
   }
@@ -268,7 +268,7 @@ public:
    * Addition.
    */
   VectorizedArray &
-  operator += (const VectorizedArray &vec)
+  operator+=(const VectorizedArray &vec)
   {
     const svfloat64_t t0 = svld1_f64(svptrue_b64(), data);
     const svfloat64_t t1 = svld1_f64(svptrue_b64(), vec.data);
@@ -280,7 +280,7 @@ public:
    * Subtraction.
    */
   VectorizedArray &
-  operator -= (const VectorizedArray &vec)
+  operator-=(const VectorizedArray &vec)
   {
     const svfloat64_t t0 = svld1_f64(svptrue_b64(), data);
     const svfloat64_t t1 = svld1_f64(svptrue_b64(), vec.data);
@@ -292,7 +292,7 @@ public:
    * Multiplication.
    */
   VectorizedArray &
-  operator *= (const VectorizedArray &vec)
+  operator*=(const VectorizedArray &vec)
   {
     const svfloat64_t t0 = svld1_f64(svptrue_b64(), data);
     const svfloat64_t t1 = svld1_f64(svptrue_b64(), vec.data);
@@ -304,7 +304,7 @@ public:
    * Division.
    */
   VectorizedArray &
-  operator /= (const VectorizedArray &vec)
+  operator/=(const VectorizedArray &vec)
   {
     const svfloat64_t t0 = svld1_f64(svptrue_b64(), data);
     const svfloat64_t t1 = svld1_f64(svptrue_b64(), vec.data);
@@ -312,41 +312,51 @@ public:
     return *this;
   }
 
-  void load (const double *ptr)
+  void
+  load(const double *ptr)
   {
     const svfloat64_t t = svld1_f64(svptrue_b64(), ptr);
     svst1_f64(svptrue_b64(), data, t);
   }
 
-  void store (double *ptr) const
+  void
+  store(double *ptr) const
   {
     const svfloat64_t t = svld1_f64(svptrue_b64(), data);
     svst1_f64(svptrue_b64(), ptr, t);
   }
 
-  void streaming_store (double *ptr) const
+  void
+  streaming_store(double *ptr) const
   {
     const svfloat64_t t = svld1_f64(svptrue_b64(), data);
-    // TODO
-    svst1_f64(svptrue_b64(), ptr, t);
+    svstnt1_f64(svptrue_b64(), ptr, t);
   }
 
-  void gather (const double       *base_ptr,
-               const unsigned int *offsets)
+  void
+  gather(const double *base_ptr, const unsigned int *offsets)
   {
-    // TODO
+    const svuint64_t  indices = svld1uw_u64(svptrue_b64(), offsets);
+    const svfloat64_t t =
+      svld1_gather_u64index_f64(svptrue_b64(), base_ptr, indices);
+    svst1_f64(svptrue_b64(), data, t);
   }
 
-  void scatter (const unsigned int *offsets,
-                double             *base_ptr) const
+  void
+  scatter(const unsigned int *offsets, double *base_ptr) const
   {
-    // TODO
+    const svuint64_t  indices = svld1uw_u64(svptrue_b64(), offsets);
+    const svfloat64_t t       = svld1_f64(svptrue_b64(), data);
+    svst1_scatter_u64index_f64(svptrue_b64(), base_ptr, indices, t);
   }
 
-  VectorizedArray get_abs () const
+  VectorizedArray
+  get_abs() const
   {
-    // TODO
-    return *this;
+    const svfloat64_t t = svld1_f64(svptrue_b64(), data);
+    VectorizedArray   result;
+    svst1_f64(svptrue_b64(), result.data, svabs_f64_z(svptrue_b64(), t));
+    return result;
   }
 
   double data[8];
@@ -372,7 +382,7 @@ public:
    * This function can be used to set all data fields to a given scalar.
    */
   VectorizedArray &
-  operator = (const double x)
+  operator=(const double x)
   {
     data = _mm512_set1_pd(x);
     return *this;
@@ -381,32 +391,30 @@ public:
   /**
    * Access operator.
    */
-  double &
-  operator [] (const unsigned int comp)
+  double &operator[](const unsigned int comp)
   {
-    return *(reinterpret_cast<double *>(&data)+comp);
+    return *(reinterpret_cast<double *>(&data) + comp);
   }
 
   /**
    * Constant access operator.
    */
-  const double &
-  operator [] (const unsigned int comp) const
+  const double &operator[](const unsigned int comp) const
   {
-    return *(reinterpret_cast<const double *>(&data)+comp);
+    return *(reinterpret_cast<const double *>(&data) + comp);
   }
 
   /**
    * Addition.
    */
   VectorizedArray &
-  operator += (const VectorizedArray &vec)
+  operator+=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data += vec.data;
-#else
-    data = _mm512_add_pd(data,vec.data);
-#endif
+#  else
+    data = _mm512_add_pd(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -414,13 +422,13 @@ public:
    * Subtraction.
    */
   VectorizedArray &
-  operator -= (const VectorizedArray &vec)
+  operator-=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data -= vec.data;
-#else
-    data = _mm512_sub_pd(data,vec.data);
-#endif
+#  else
+    data = _mm512_sub_pd(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -428,13 +436,13 @@ public:
    * Multiplication.
    */
   VectorizedArray &
-  operator *= (const VectorizedArray &vec)
+  operator*=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data *= vec.data;
-#else
-    data = _mm512_mul_pd(data,vec.data);
-#endif
+#  else
+    data = _mm512_mul_pd(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -442,55 +450,59 @@ public:
    * Division.
    */
   VectorizedArray &
-  operator /= (const VectorizedArray &vec)
+  operator/=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data /= vec.data;
-#else
-    data = _mm512_div_pd(data,vec.data);
-#endif
+#  else
+    data = _mm512_div_pd(data, vec.data);
+#  endif
     return *this;
   }
 
-  void load (const double *ptr)
+  void
+  load(const double *ptr)
   {
-    data = _mm512_loadu_pd (ptr);
+    data = _mm512_loadu_pd(ptr);
   }
 
-  void store (double *ptr) const
+  void
+  store(double *ptr) const
   {
-    _mm512_storeu_pd (ptr, data);
+    _mm512_storeu_pd(ptr, data);
   }
 
-  void streaming_store (double *ptr) const
+  void
+  streaming_store(double *ptr) const
   {
-    _mm512_stream_pd(ptr,data);
+    _mm512_stream_pd(ptr, data);
   }
 
-  void gather (const double       *base_ptr,
-               const unsigned int *offsets)
+  void
+  gather(const double *base_ptr, const unsigned int *offsets)
   {
-    const __m256 index_val = _mm256_loadu_ps((const float *)offsets);
-    const __m256i index = *((__m256i *)(&index_val));
-    data = _mm512_i32gather_pd(index, base_ptr, 8);
+    const __m256  index_val = _mm256_loadu_ps((const float *)offsets);
+    const __m256i index     = *((__m256i *)(&index_val));
+    data                    = _mm512_i32gather_pd(index, base_ptr, 8);
   }
 
-  void scatter (const unsigned int *offsets,
-                double             *base_ptr) const
+  void
+  scatter(const unsigned int *offsets, double *base_ptr) const
   {
-    const __m256 index_val = _mm256_loadu_ps((const float *)offsets);
-    const __m256i index = *((__m256i *)(&index_val));
+    const __m256  index_val = _mm256_loadu_ps((const float *)offsets);
+    const __m256i index     = *((__m256i *)(&index_val));
     _mm512_i32scatter_pd(base_ptr, index, data, 8);
   }
 
-  VectorizedArray get_abs () const
+  VectorizedArray
+  get_abs() const
   {
     // to compute the absolute value, perform bitwise andnot with -0. This
     // will leave all value and exponent bits unchanged but force the sign
     // value to +
-    __m512d mask = _mm512_set1_pd (-0.);
+    __m512d         mask = _mm512_set1_pd(-0.);
     VectorizedArray res;
-    res.data = (__m512d)_mm512_andnot_epi64 ((__m512i)mask, (__m512i)data);
+    res.data = (__m512d)_mm512_andnot_epi64((__m512i)mask, (__m512i)data);
     return res;
   }
 
@@ -498,39 +510,42 @@ public:
 };
 
 template <>
-inline
-void
+inline void
 vectorized_load_and_transpose(const unsigned int       n_entries,
-                              const double            *in,
-                              const unsigned int      *offsets,
+                              const double *           in,
+                              const unsigned int *     offsets,
                               VectorizedArray<double> *out)
 {
-  const unsigned int n_chunks = n_entries/4;
-  for (unsigned int outer=0; outer<8; outer += 4)
+  const unsigned int n_chunks = n_entries / 4;
+  for (unsigned int outer = 0; outer < 8; outer += 4)
     {
-      const double *in0 = in + offsets[0+outer];
-      const double *in1 = in + offsets[1+outer];
-      const double *in2 = in + offsets[2+outer];
-      const double *in3 = in + offsets[3+outer];
+      const double *in0 = in + offsets[0 + outer];
+      const double *in1 = in + offsets[1 + outer];
+      const double *in2 = in + offsets[2 + outer];
+      const double *in3 = in + offsets[3 + outer];
 
-      for (unsigned int i=0; i<n_chunks; ++i)
+      for (unsigned int i = 0; i < n_chunks; ++i)
         {
-          __m256d u0 = _mm256_loadu_pd(in0+4*i);
-          __m256d u1 = _mm256_loadu_pd(in1+4*i);
-          __m256d u2 = _mm256_loadu_pd(in2+4*i);
-          __m256d u3 = _mm256_loadu_pd(in3+4*i);
-          __m256d t0 = _mm256_permute2f128_pd (u0, u2, 0x20);
-          __m256d t1 = _mm256_permute2f128_pd (u1, u3, 0x20);
-          __m256d t2 = _mm256_permute2f128_pd (u0, u2, 0x31);
-          __m256d t3 = _mm256_permute2f128_pd (u1, u3, 0x31);
-          *(__m256d *)((double *)(&out[4*i+0].data)+outer) = _mm256_unpacklo_pd (t0, t1);
-          *(__m256d *)((double *)(&out[4*i+1].data)+outer) = _mm256_unpackhi_pd (t0, t1);
-          *(__m256d *)((double *)(&out[4*i+2].data)+outer) = _mm256_unpacklo_pd (t2, t3);
-          *(__m256d *)((double *)(&out[4*i+3].data)+outer) = _mm256_unpackhi_pd (t2, t3);
+          __m256d u0 = _mm256_loadu_pd(in0 + 4 * i);
+          __m256d u1 = _mm256_loadu_pd(in1 + 4 * i);
+          __m256d u2 = _mm256_loadu_pd(in2 + 4 * i);
+          __m256d u3 = _mm256_loadu_pd(in3 + 4 * i);
+          __m256d t0 = _mm256_permute2f128_pd(u0, u2, 0x20);
+          __m256d t1 = _mm256_permute2f128_pd(u1, u3, 0x20);
+          __m256d t2 = _mm256_permute2f128_pd(u0, u2, 0x31);
+          __m256d t3 = _mm256_permute2f128_pd(u1, u3, 0x31);
+          *(__m256d *)((double *)(&out[4 * i + 0].data) + outer) =
+            _mm256_unpacklo_pd(t0, t1);
+          *(__m256d *)((double *)(&out[4 * i + 1].data) + outer) =
+            _mm256_unpackhi_pd(t0, t1);
+          *(__m256d *)((double *)(&out[4 * i + 2].data) + outer) =
+            _mm256_unpacklo_pd(t2, t3);
+          *(__m256d *)((double *)(&out[4 * i + 3].data) + outer) =
+            _mm256_unpackhi_pd(t2, t3);
         }
-      for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-        for (unsigned int v=0; v<4; ++v)
-          out[i][outer+v] = in[offsets[v+outer]+i];
+      for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+        for (unsigned int v = 0; v < 4; ++v)
+          out[i][outer + v] = in[offsets[v + outer] + i];
     }
 }
 
@@ -540,69 +555,72 @@ vectorized_load_and_transpose(const unsigned int       n_entries,
  * Specialization for double and AVX-512.
  */
 template <>
-inline
-void
+inline void
 vectorized_transpose_and_store(const bool                     add_into,
                                const unsigned int             n_entries,
                                const VectorizedArray<double> *in,
-                               const unsigned int            *offsets,
-                               double                        *out)
+                               const unsigned int *           offsets,
+                               double *                       out)
 {
-  const unsigned int n_chunks = n_entries/4;
+  const unsigned int n_chunks = n_entries / 4;
   // do not do full transpose because the code is too long and will most
   // likely not pay off. rather do the transposition on the vectorized array
   // on size smaller, mm256d
-  for (unsigned int outer=0; outer<8; outer += 4)
+  for (unsigned int outer = 0; outer < 8; outer += 4)
     {
-      double *out0 = out + offsets[0+outer];
-      double *out1 = out + offsets[1+outer];
-      double *out2 = out + offsets[2+outer];
-      double *out3 = out + offsets[3+outer];
-      for (unsigned int i=0; i<n_chunks; ++i)
+      double *out0 = out + offsets[0 + outer];
+      double *out1 = out + offsets[1 + outer];
+      double *out2 = out + offsets[2 + outer];
+      double *out3 = out + offsets[3 + outer];
+      for (unsigned int i = 0; i < n_chunks; ++i)
         {
-          __m256d u0 = *(const __m256d *)((const double *)(&in[4*i+0].data)+outer);
-          __m256d u1 = *(const __m256d *)((const double *)(&in[4*i+1].data)+outer);
-          __m256d u2 = *(const __m256d *)((const double *)(&in[4*i+2].data)+outer);
-          __m256d u3 = *(const __m256d *)((const double *)(&in[4*i+3].data)+outer);
-          __m256d t0 = _mm256_permute2f128_pd (u0, u2, 0x20);
-          __m256d t1 = _mm256_permute2f128_pd (u1, u3, 0x20);
-          __m256d t2 = _mm256_permute2f128_pd (u0, u2, 0x31);
-          __m256d t3 = _mm256_permute2f128_pd (u1, u3, 0x31);
-          __m256d res0 = _mm256_unpacklo_pd (t0, t1);
-          __m256d res1 = _mm256_unpackhi_pd (t0, t1);
-          __m256d res2 = _mm256_unpacklo_pd (t2, t3);
-          __m256d res3 = _mm256_unpackhi_pd (t2, t3);
+          __m256d u0 =
+            *(const __m256d *)((const double *)(&in[4 * i + 0].data) + outer);
+          __m256d u1 =
+            *(const __m256d *)((const double *)(&in[4 * i + 1].data) + outer);
+          __m256d u2 =
+            *(const __m256d *)((const double *)(&in[4 * i + 2].data) + outer);
+          __m256d u3 =
+            *(const __m256d *)((const double *)(&in[4 * i + 3].data) + outer);
+          __m256d t0   = _mm256_permute2f128_pd(u0, u2, 0x20);
+          __m256d t1   = _mm256_permute2f128_pd(u1, u3, 0x20);
+          __m256d t2   = _mm256_permute2f128_pd(u0, u2, 0x31);
+          __m256d t3   = _mm256_permute2f128_pd(u1, u3, 0x31);
+          __m256d res0 = _mm256_unpacklo_pd(t0, t1);
+          __m256d res1 = _mm256_unpackhi_pd(t0, t1);
+          __m256d res2 = _mm256_unpacklo_pd(t2, t3);
+          __m256d res3 = _mm256_unpackhi_pd(t2, t3);
 
           // Cannot use the same store instructions in both paths of the 'if'
           // because the compiler cannot know that there is no aliasing between
           // pointers
           if (add_into)
             {
-              res0 = _mm256_add_pd(_mm256_loadu_pd(out0+4*i), res0);
-              _mm256_storeu_pd(out0+4*i, res0);
-              res1 = _mm256_add_pd(_mm256_loadu_pd(out1+4*i), res1);
-              _mm256_storeu_pd(out1+4*i, res1);
-              res2 = _mm256_add_pd(_mm256_loadu_pd(out2+4*i), res2);
-              _mm256_storeu_pd(out2+4*i, res2);
-              res3 = _mm256_add_pd(_mm256_loadu_pd(out3+4*i), res3);
-              _mm256_storeu_pd(out3+4*i, res3);
+              res0 = _mm256_add_pd(_mm256_loadu_pd(out0 + 4 * i), res0);
+              _mm256_storeu_pd(out0 + 4 * i, res0);
+              res1 = _mm256_add_pd(_mm256_loadu_pd(out1 + 4 * i), res1);
+              _mm256_storeu_pd(out1 + 4 * i, res1);
+              res2 = _mm256_add_pd(_mm256_loadu_pd(out2 + 4 * i), res2);
+              _mm256_storeu_pd(out2 + 4 * i, res2);
+              res3 = _mm256_add_pd(_mm256_loadu_pd(out3 + 4 * i), res3);
+              _mm256_storeu_pd(out3 + 4 * i, res3);
             }
           else
             {
-              _mm256_storeu_pd(out0+4*i, res0);
-              _mm256_storeu_pd(out1+4*i, res1);
-              _mm256_storeu_pd(out2+4*i, res2);
-              _mm256_storeu_pd(out3+4*i, res3);
+              _mm256_storeu_pd(out0 + 4 * i, res0);
+              _mm256_storeu_pd(out1 + 4 * i, res1);
+              _mm256_storeu_pd(out2 + 4 * i, res2);
+              _mm256_storeu_pd(out3 + 4 * i, res3);
             }
         }
       if (add_into)
-        for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-          for (unsigned int v=0; v<4; ++v)
-            out[offsets[v+outer]+i] += in[i][v+outer];
+        for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+          for (unsigned int v = 0; v < 4; ++v)
+            out[offsets[v + outer] + i] += in[i][v + outer];
       else
-        for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-          for (unsigned int v=0; v<4; ++v)
-            out[offsets[v+outer]+i] = in[i][v+outer];
+        for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+          for (unsigned int v = 0; v < 4; ++v)
+            out[offsets[v + outer] + i] = in[i][v + outer];
     }
 }
 
@@ -611,7 +629,7 @@ vectorized_transpose_and_store(const bool                     add_into,
 /**
  * Specialization for float and AVX512.
  */
-template<>
+template <>
 class VectorizedArray<float>
 {
 public:
@@ -624,7 +642,7 @@ public:
    * This function can be used to set all data fields to a given scalar.
    */
   VectorizedArray &
-  operator = (const float x)
+  operator=(const float x)
   {
     data = _mm512_set1_ps(x);
     return *this;
@@ -633,32 +651,30 @@ public:
   /**
    * Access operator.
    */
-  float &
-  operator [] (const unsigned int comp)
+  float &operator[](const unsigned int comp)
   {
-    return *(reinterpret_cast<float *>(&data)+comp);
+    return *(reinterpret_cast<float *>(&data) + comp);
   }
 
   /**
    * Constant access operator.
    */
-  const float &
-  operator [] (const unsigned int comp) const
+  const float &operator[](const unsigned int comp) const
   {
-    return *(reinterpret_cast<const float *>(&data)+comp);
+    return *(reinterpret_cast<const float *>(&data) + comp);
   }
 
   /**
    * Addition.
    */
   VectorizedArray &
-  operator += (const VectorizedArray &vec)
+  operator+=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data += vec.data;
-#else
-    data = _mm512_add_ps(data,vec.data);
-#endif
+#  else
+    data = _mm512_add_ps(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -666,13 +682,13 @@ public:
    * Subtraction.
    */
   VectorizedArray &
-  operator -= (const VectorizedArray &vec)
+  operator-=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data -= vec.data;
-#else
-    data = _mm512_sub_ps(data,vec.data);
-#endif
+#  else
+    data = _mm512_sub_ps(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -680,13 +696,13 @@ public:
    * Multiplication.
    */
   VectorizedArray &
-  operator *= (const VectorizedArray &vec)
+  operator*=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data *= vec.data;
-#else
-    data = _mm512_mul_ps(data,vec.data);
-#endif
+#  else
+    data = _mm512_mul_ps(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -694,52 +710,56 @@ public:
    * Division.
    */
   VectorizedArray &
-  operator /= (const VectorizedArray &vec)
+  operator/=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data /= vec.data;
-#else
-    data = _mm512_div_ps(data,vec.data);
-#endif
+#  else
+    data = _mm512_div_ps(data, vec.data);
+#  endif
     return *this;
   }
 
-  void load (const float *ptr)
+  void
+  load(const float *ptr)
   {
-    data = _mm512_loadu_ps (ptr);
+    data = _mm512_loadu_ps(ptr);
   }
 
-  void store (float *ptr) const
+  void
+  store(float *ptr) const
   {
-    _mm512_storeu_ps (ptr, data);
+    _mm512_storeu_ps(ptr, data);
   }
 
-  void streaming_store (float *ptr) const
+  void
+  streaming_store(float *ptr) const
   {
-    _mm512_stream_ps(ptr,data);
+    _mm512_stream_ps(ptr, data);
   }
 
-  void gather (const float        *base_ptr,
-               const unsigned int *offsets)
+  void
+  gather(const float *base_ptr, const unsigned int *offsets)
   {
-    const __m512 index_val = _mm512_loadu_ps((const float *)offsets);
-    const __m512i index = *((__m512i *)(&index_val));
-    data = _mm512_i32gather_ps(index, base_ptr, 4);
+    const __m512  index_val = _mm512_loadu_ps((const float *)offsets);
+    const __m512i index     = *((__m512i *)(&index_val));
+    data                    = _mm512_i32gather_ps(index, base_ptr, 4);
   }
 
-  void scatter (const unsigned int *offsets,
-                float              *base_ptr) const
+  void
+  scatter(const unsigned int *offsets, float *base_ptr) const
   {
-    const __m512 index_val = _mm512_loadu_ps((const float *)offsets);
-    const __m512i index = *((__m512i *)(&index_val));
+    const __m512  index_val = _mm512_loadu_ps((const float *)offsets);
+    const __m512i index     = *((__m512i *)(&index_val));
     _mm512_i32scatter_ps(base_ptr, index, data, 4);
   }
 
-  VectorizedArray get_abs () const
+  VectorizedArray
+  get_abs() const
   {
-    __m512 mask = _mm512_set1_ps (-0.f);
+    __m512          mask = _mm512_set1_ps(-0.f);
     VectorizedArray res;
-    res.data = (__m512)_mm512_andnot_epi32 ((__m512i)mask, (__m512i)data);
+    res.data = (__m512)_mm512_andnot_epi32((__m512i)mask, (__m512i)data);
     return res;
   }
 
@@ -747,49 +767,52 @@ public:
 };
 
 template <>
-inline
-void
+inline void
 vectorized_load_and_transpose(const unsigned int      n_entries,
-                              const float            *in,
-                              const unsigned int     *offsets,
+                              const float *           in,
+                              const unsigned int *    offsets,
                               VectorizedArray<float> *out)
 {
-  const unsigned int n_chunks = n_entries/4;
-  for (unsigned int outer = 0; outer<16; outer += 8)
+  const unsigned int n_chunks = n_entries / 4;
+  for (unsigned int outer = 0; outer < 16; outer += 8)
     {
-      for (unsigned int i=0; i<n_chunks; ++i)
+      for (unsigned int i = 0; i < n_chunks; ++i)
         {
-          __m128 u0 = _mm_loadu_ps(in+4*i+offsets[0+outer]);
-          __m128 u1 = _mm_loadu_ps(in+4*i+offsets[1+outer]);
-          __m128 u2 = _mm_loadu_ps(in+4*i+offsets[2+outer]);
-          __m128 u3 = _mm_loadu_ps(in+4*i+offsets[3+outer]);
-          __m128 u4 = _mm_loadu_ps(in+4*i+offsets[4+outer]);
-          __m128 u5 = _mm_loadu_ps(in+4*i+offsets[5+outer]);
-          __m128 u6 = _mm_loadu_ps(in+4*i+offsets[6+outer]);
-          __m128 u7 = _mm_loadu_ps(in+4*i+offsets[7+outer]);
+          __m128 u0 = _mm_loadu_ps(in + 4 * i + offsets[0 + outer]);
+          __m128 u1 = _mm_loadu_ps(in + 4 * i + offsets[1 + outer]);
+          __m128 u2 = _mm_loadu_ps(in + 4 * i + offsets[2 + outer]);
+          __m128 u3 = _mm_loadu_ps(in + 4 * i + offsets[3 + outer]);
+          __m128 u4 = _mm_loadu_ps(in + 4 * i + offsets[4 + outer]);
+          __m128 u5 = _mm_loadu_ps(in + 4 * i + offsets[5 + outer]);
+          __m128 u6 = _mm_loadu_ps(in + 4 * i + offsets[6 + outer]);
+          __m128 u7 = _mm_loadu_ps(in + 4 * i + offsets[7 + outer]);
           // To avoid warnings about uninitialized variables, need to initialize
           // one variable with zero before using it.
           __m256 t0, t1, t2, t3 = _mm256_set1_ps(0.F);
-          t0 = _mm256_insertf128_ps (t3, u0, 0);
-          t0 = _mm256_insertf128_ps (t0, u4, 1);
-          t1 = _mm256_insertf128_ps (t3, u1, 0);
-          t1 = _mm256_insertf128_ps (t1, u5, 1);
-          t2 = _mm256_insertf128_ps (t3, u2, 0);
-          t2 = _mm256_insertf128_ps (t2, u6, 1);
-          t3 = _mm256_insertf128_ps (t3, u3, 0);
-          t3 = _mm256_insertf128_ps (t3, u7, 1);
-          __m256 v0 = _mm256_shuffle_ps (t0, t1, 0x44);
-          __m256 v1 = _mm256_shuffle_ps (t0, t1, 0xee);
-          __m256 v2 = _mm256_shuffle_ps (t2, t3, 0x44);
-          __m256 v3 = _mm256_shuffle_ps (t2, t3, 0xee);
-          *(__m256 *)((float *)(&out[4*i+0].data)+outer) = _mm256_shuffle_ps (v0, v2, 0x88);
-          *(__m256 *)((float *)(&out[4*i+1].data)+outer) = _mm256_shuffle_ps (v0, v2, 0xdd);
-          *(__m256 *)((float *)(&out[4*i+2].data)+outer) = _mm256_shuffle_ps (v1, v3, 0x88);
-          *(__m256 *)((float *)(&out[4*i+3].data)+outer) = _mm256_shuffle_ps (v1, v3, 0xdd);
+          t0        = _mm256_insertf128_ps(t3, u0, 0);
+          t0        = _mm256_insertf128_ps(t0, u4, 1);
+          t1        = _mm256_insertf128_ps(t3, u1, 0);
+          t1        = _mm256_insertf128_ps(t1, u5, 1);
+          t2        = _mm256_insertf128_ps(t3, u2, 0);
+          t2        = _mm256_insertf128_ps(t2, u6, 1);
+          t3        = _mm256_insertf128_ps(t3, u3, 0);
+          t3        = _mm256_insertf128_ps(t3, u7, 1);
+          __m256 v0 = _mm256_shuffle_ps(t0, t1, 0x44);
+          __m256 v1 = _mm256_shuffle_ps(t0, t1, 0xee);
+          __m256 v2 = _mm256_shuffle_ps(t2, t3, 0x44);
+          __m256 v3 = _mm256_shuffle_ps(t2, t3, 0xee);
+          *(__m256 *)((float *)(&out[4 * i + 0].data) + outer) =
+            _mm256_shuffle_ps(v0, v2, 0x88);
+          *(__m256 *)((float *)(&out[4 * i + 1].data) + outer) =
+            _mm256_shuffle_ps(v0, v2, 0xdd);
+          *(__m256 *)((float *)(&out[4 * i + 2].data) + outer) =
+            _mm256_shuffle_ps(v1, v3, 0x88);
+          *(__m256 *)((float *)(&out[4 * i + 3].data) + outer) =
+            _mm256_shuffle_ps(v1, v3, 0xdd);
         }
-      for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-        for (unsigned int v=0; v<8; ++v)
-          out[i][v+outer] = in[offsets[v+outer]+i];
+      for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+        for (unsigned int v = 0; v < 8; ++v)
+          out[i][v + outer] = in[offsets[v + outer] + i];
     }
 }
 
@@ -799,82 +822,93 @@ vectorized_load_and_transpose(const unsigned int      n_entries,
  * Specialization for float and AVX-512.
  */
 template <>
-inline
-void
+inline void
 vectorized_transpose_and_store(const bool                    add_into,
                                const unsigned int            n_entries,
                                const VectorizedArray<float> *in,
-                               const unsigned int           *offsets,
-                               float                        *out)
+                               const unsigned int *          offsets,
+                               float *                       out)
 {
-  const unsigned int n_chunks = n_entries/4;
-  for (unsigned int outer = 0; outer<16; outer += 8)
+  const unsigned int n_chunks = n_entries / 4;
+  for (unsigned int outer = 0; outer < 16; outer += 8)
     {
-      for (unsigned int i=0; i<n_chunks; ++i)
+      for (unsigned int i = 0; i < n_chunks; ++i)
         {
-          __m256 u0 = *(const __m256 *)((const float *)(&in[4*i+0].data)+outer);
-          __m256 u1 = *(const __m256 *)((const float *)(&in[4*i+1].data)+outer);
-          __m256 u2 = *(const __m256 *)((const float *)(&in[4*i+2].data)+outer);
-          __m256 u3 = *(const __m256 *)((const float *)(&in[4*i+3].data)+outer);
-          __m256 t0 = _mm256_shuffle_ps (u0, u1, 0x44);
-          __m256 t1 = _mm256_shuffle_ps (u0, u1, 0xee);
-          __m256 t2 = _mm256_shuffle_ps (u2, u3, 0x44);
-          __m256 t3 = _mm256_shuffle_ps (u2, u3, 0xee);
-          u0 = _mm256_shuffle_ps (t0, t2, 0x88);
-          u1 = _mm256_shuffle_ps (t0, t2, 0xdd);
-          u2 = _mm256_shuffle_ps (t1, t3, 0x88);
-          u3 = _mm256_shuffle_ps (t1, t3, 0xdd);
-          __m128 res0 = _mm256_extractf128_ps (u0, 0);
-          __m128 res4 = _mm256_extractf128_ps (u0, 1);
-          __m128 res1 = _mm256_extractf128_ps (u1, 0);
-          __m128 res5 = _mm256_extractf128_ps (u1, 1);
-          __m128 res2 = _mm256_extractf128_ps (u2, 0);
-          __m128 res6 = _mm256_extractf128_ps (u2, 1);
-          __m128 res3 = _mm256_extractf128_ps (u3, 0);
-          __m128 res7 = _mm256_extractf128_ps (u3, 1);
+          __m256 u0 =
+            *(const __m256 *)((const float *)(&in[4 * i + 0].data) + outer);
+          __m256 u1 =
+            *(const __m256 *)((const float *)(&in[4 * i + 1].data) + outer);
+          __m256 u2 =
+            *(const __m256 *)((const float *)(&in[4 * i + 2].data) + outer);
+          __m256 u3 =
+            *(const __m256 *)((const float *)(&in[4 * i + 3].data) + outer);
+          __m256 t0   = _mm256_shuffle_ps(u0, u1, 0x44);
+          __m256 t1   = _mm256_shuffle_ps(u0, u1, 0xee);
+          __m256 t2   = _mm256_shuffle_ps(u2, u3, 0x44);
+          __m256 t3   = _mm256_shuffle_ps(u2, u3, 0xee);
+          u0          = _mm256_shuffle_ps(t0, t2, 0x88);
+          u1          = _mm256_shuffle_ps(t0, t2, 0xdd);
+          u2          = _mm256_shuffle_ps(t1, t3, 0x88);
+          u3          = _mm256_shuffle_ps(t1, t3, 0xdd);
+          __m128 res0 = _mm256_extractf128_ps(u0, 0);
+          __m128 res4 = _mm256_extractf128_ps(u0, 1);
+          __m128 res1 = _mm256_extractf128_ps(u1, 0);
+          __m128 res5 = _mm256_extractf128_ps(u1, 1);
+          __m128 res2 = _mm256_extractf128_ps(u2, 0);
+          __m128 res6 = _mm256_extractf128_ps(u2, 1);
+          __m128 res3 = _mm256_extractf128_ps(u3, 0);
+          __m128 res7 = _mm256_extractf128_ps(u3, 1);
 
           // Cannot use the same store instructions in both paths of the 'if'
           // because the compiler cannot know that there is no aliasing between
           // pointers
           if (add_into)
             {
-              res0 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[0+outer]), res0);
-              _mm_storeu_ps(out+4*i+offsets[0+outer], res0);
-              res1 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[1+outer]), res1);
-              _mm_storeu_ps(out+4*i+offsets[1+outer], res1);
-              res2 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[2+outer]), res2);
-              _mm_storeu_ps(out+4*i+offsets[2+outer], res2);
-              res3 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[3+outer]), res3);
-              _mm_storeu_ps(out+4*i+offsets[3+outer], res3);
-              res4 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[4+outer]), res4);
-              _mm_storeu_ps(out+4*i+offsets[4+outer], res4);
-              res5 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[5+outer]), res5);
-              _mm_storeu_ps(out+4*i+offsets[5+outer], res5);
-              res6 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[6+outer]), res6);
-              _mm_storeu_ps(out+4*i+offsets[6+outer], res6);
-              res7 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[7+outer]), res7);
-              _mm_storeu_ps(out+4*i+offsets[7+outer], res7);
+              res0 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[0 + outer]),
+                                res0);
+              _mm_storeu_ps(out + 4 * i + offsets[0 + outer], res0);
+              res1 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[1 + outer]),
+                                res1);
+              _mm_storeu_ps(out + 4 * i + offsets[1 + outer], res1);
+              res2 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[2 + outer]),
+                                res2);
+              _mm_storeu_ps(out + 4 * i + offsets[2 + outer], res2);
+              res3 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[3 + outer]),
+                                res3);
+              _mm_storeu_ps(out + 4 * i + offsets[3 + outer], res3);
+              res4 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[4 + outer]),
+                                res4);
+              _mm_storeu_ps(out + 4 * i + offsets[4 + outer], res4);
+              res5 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[5 + outer]),
+                                res5);
+              _mm_storeu_ps(out + 4 * i + offsets[5 + outer], res5);
+              res6 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[6 + outer]),
+                                res6);
+              _mm_storeu_ps(out + 4 * i + offsets[6 + outer], res6);
+              res7 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[7 + outer]),
+                                res7);
+              _mm_storeu_ps(out + 4 * i + offsets[7 + outer], res7);
             }
           else
             {
-              _mm_storeu_ps(out+4*i+offsets[0+outer], res0);
-              _mm_storeu_ps(out+4*i+offsets[1+outer], res1);
-              _mm_storeu_ps(out+4*i+offsets[2+outer], res2);
-              _mm_storeu_ps(out+4*i+offsets[3+outer], res3);
-              _mm_storeu_ps(out+4*i+offsets[4+outer], res4);
-              _mm_storeu_ps(out+4*i+offsets[5+outer], res5);
-              _mm_storeu_ps(out+4*i+offsets[6+outer], res6);
-              _mm_storeu_ps(out+4*i+offsets[7+outer], res7);
+              _mm_storeu_ps(out + 4 * i + offsets[0 + outer], res0);
+              _mm_storeu_ps(out + 4 * i + offsets[1 + outer], res1);
+              _mm_storeu_ps(out + 4 * i + offsets[2 + outer], res2);
+              _mm_storeu_ps(out + 4 * i + offsets[3 + outer], res3);
+              _mm_storeu_ps(out + 4 * i + offsets[4 + outer], res4);
+              _mm_storeu_ps(out + 4 * i + offsets[5 + outer], res5);
+              _mm_storeu_ps(out + 4 * i + offsets[6 + outer], res6);
+              _mm_storeu_ps(out + 4 * i + offsets[7 + outer], res7);
             }
         }
       if (add_into)
-        for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-          for (unsigned int v=0; v<8; ++v)
-            out[offsets[v+outer]+i] += in[i][v+outer];
+        for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+          for (unsigned int v = 0; v < 8; ++v)
+            out[offsets[v + outer] + i] += in[i][v + outer];
       else
-        for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-          for (unsigned int v=0; v<8; ++v)
-            out[offsets[v+outer]+i] = in[i][v+outer];
+        for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+          for (unsigned int v = 0; v < 8; ++v)
+            out[offsets[v + outer] + i] = in[i][v + outer];
     }
 }
 
@@ -897,7 +931,7 @@ public:
    * This function can be used to set all data fields to a given scalar.
    */
   VectorizedArray &
-  operator = (const double x)
+  operator=(const double x)
   {
     data = _mm256_set1_pd(x);
     return *this;
@@ -906,32 +940,30 @@ public:
   /**
    * Access operator.
    */
-  double &
-  operator [] (const unsigned int comp)
+  double &operator[](const unsigned int comp)
   {
-    return *(reinterpret_cast<double *>(&data)+comp);
+    return *(reinterpret_cast<double *>(&data) + comp);
   }
 
   /**
    * Constant access operator.
    */
-  const double &
-  operator [] (const unsigned int comp) const
+  const double &operator[](const unsigned int comp) const
   {
-    return *(reinterpret_cast<const double *>(&data)+comp);
+    return *(reinterpret_cast<const double *>(&data) + comp);
   }
 
   /**
    * Addition.
    */
   VectorizedArray &
-  operator += (const VectorizedArray &vec)
+  operator+=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data += vec.data;
-#else
-    data = _mm256_add_pd(data,vec.data);
-#endif
+#  else
+    data = _mm256_add_pd(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -939,13 +971,13 @@ public:
    * Subtraction.
    */
   VectorizedArray &
-  operator -= (const VectorizedArray &vec)
+  operator-=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data -= vec.data;
-#else
-    data = _mm256_sub_pd(data,vec.data);
-#endif
+#  else
+    data = _mm256_sub_pd(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -953,13 +985,13 @@ public:
    * Multiplication.
    */
   VectorizedArray &
-  operator *= (const VectorizedArray &vec)
+  operator*=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data *= vec.data;
-#else
-    data = _mm256_mul_pd(data,vec.data);
-#endif
+#  else
+    data = _mm256_mul_pd(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -967,55 +999,59 @@ public:
    * Division.
    */
   VectorizedArray &
-  operator /= (const VectorizedArray &vec)
+  operator/=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data /= vec.data;
-#else
-    data = _mm256_div_pd(data,vec.data);
-#endif
+#  else
+    data = _mm256_div_pd(data, vec.data);
+#  endif
     return *this;
   }
 
-  void load (const double *ptr)
+  void
+  load(const double *ptr)
   {
-    data = _mm256_loadu_pd (ptr);
+    data = _mm256_loadu_pd(ptr);
   }
 
-  void store (double *ptr) const
+  void
+  store(double *ptr) const
   {
-    _mm256_storeu_pd (ptr, data);
+    _mm256_storeu_pd(ptr, data);
   }
 
-  void streaming_store (double *ptr) const
+  void
+  streaming_store(double *ptr) const
   {
-    _mm256_stream_pd(ptr,data);
+    _mm256_stream_pd(ptr, data);
   }
 
-  void gather (const double       *base_ptr,
-               const unsigned int *offsets)
+  void
+  gather(const double *base_ptr, const unsigned int *offsets)
   {
-#if __AVX2__
-    const __m128 index_val = _mm_loadu_ps((const float *)offsets);
-    const __m128i index = *((__m128i *)(&index_val));
-    data = _mm256_i32gather_pd(base_ptr, index, 8);
-#else
-    for (unsigned int i=0; i<4; ++i)
-      *(reinterpret_cast<double *>(&data)+i) = base_ptr[offsets[i]];
-#endif
+#  if __AVX2__
+    const __m128  index_val = _mm_loadu_ps((const float *)offsets);
+    const __m128i index     = *((__m128i *)(&index_val));
+    data                    = _mm256_i32gather_pd(base_ptr, index, 8);
+#  else
+    for (unsigned int i = 0; i < 4; ++i)
+      *(reinterpret_cast<double *>(&data) + i) = base_ptr[offsets[i]];
+#  endif
   }
 
-  void scatter (const unsigned int *offsets,
-                double             *base_ptr) const
+  void
+  scatter(const unsigned int *offsets, double *base_ptr) const
   {
     // no scatter operation in AVX/AVX2
-    for (unsigned int i=0; i<4; ++i)
-      base_ptr[offsets[i]] = *(reinterpret_cast<const double *>(&data)+i);
+    for (unsigned int i = 0; i < 4; ++i)
+      base_ptr[offsets[i]] = *(reinterpret_cast<const double *>(&data) + i);
   }
 
-  VectorizedArray get_abs () const
+  VectorizedArray
+  get_abs() const
   {
-    __m256d mask = _mm256_set1_pd (-0.);
+    __m256d         mask = _mm256_set1_pd(-0.);
     VectorizedArray res;
     res.data = _mm256_andnot_pd(mask, data);
     return res;
@@ -1025,37 +1061,36 @@ public:
 };
 
 template <>
-inline
-void
+inline void
 vectorized_load_and_transpose(const unsigned int       n_entries,
-                              const double            *in,
-                              const unsigned int      *offsets,
+                              const double *           in,
+                              const unsigned int *     offsets,
                               VectorizedArray<double> *out)
 {
-  const unsigned int n_chunks = n_entries/4;
-  const double *in0 = in + offsets[0];
-  const double *in1 = in + offsets[1];
-  const double *in2 = in + offsets[2];
-  const double *in3 = in + offsets[3];
+  const unsigned int n_chunks = n_entries / 4;
+  const double *     in0      = in + offsets[0];
+  const double *     in1      = in + offsets[1];
+  const double *     in2      = in + offsets[2];
+  const double *     in3      = in + offsets[3];
 
-  for (unsigned int i=0; i<n_chunks; ++i)
+  for (unsigned int i = 0; i < n_chunks; ++i)
     {
-      __m256d u0 = _mm256_loadu_pd(in0+4*i);
-      __m256d u1 = _mm256_loadu_pd(in1+4*i);
-      __m256d u2 = _mm256_loadu_pd(in2+4*i);
-      __m256d u3 = _mm256_loadu_pd(in3+4*i);
-      __m256d t0 = _mm256_permute2f128_pd (u0, u2, 0x20);
-      __m256d t1 = _mm256_permute2f128_pd (u1, u3, 0x20);
-      __m256d t2 = _mm256_permute2f128_pd (u0, u2, 0x31);
-      __m256d t3 = _mm256_permute2f128_pd (u1, u3, 0x31);
-      out[4*i+0].data = _mm256_unpacklo_pd (t0, t1);
-      out[4*i+1].data = _mm256_unpackhi_pd (t0, t1);
-      out[4*i+2].data = _mm256_unpacklo_pd (t2, t3);
-      out[4*i+3].data = _mm256_unpackhi_pd (t2, t3);
+      __m256d u0          = _mm256_loadu_pd(in0 + 4 * i);
+      __m256d u1          = _mm256_loadu_pd(in1 + 4 * i);
+      __m256d u2          = _mm256_loadu_pd(in2 + 4 * i);
+      __m256d u3          = _mm256_loadu_pd(in3 + 4 * i);
+      __m256d t0          = _mm256_permute2f128_pd(u0, u2, 0x20);
+      __m256d t1          = _mm256_permute2f128_pd(u1, u3, 0x20);
+      __m256d t2          = _mm256_permute2f128_pd(u0, u2, 0x31);
+      __m256d t3          = _mm256_permute2f128_pd(u1, u3, 0x31);
+      out[4 * i + 0].data = _mm256_unpacklo_pd(t0, t1);
+      out[4 * i + 1].data = _mm256_unpackhi_pd(t0, t1);
+      out[4 * i + 2].data = _mm256_unpacklo_pd(t2, t3);
+      out[4 * i + 3].data = _mm256_unpackhi_pd(t2, t3);
     }
-  for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-    for (unsigned int v=0; v<4; ++v)
-      out[i][v] = in[offsets[v]+i];
+  for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+    for (unsigned int v = 0; v < 4; ++v)
+      out[i][v] = in[offsets[v] + i];
 }
 
 
@@ -1064,71 +1099,70 @@ vectorized_load_and_transpose(const unsigned int       n_entries,
  * Specialization for double and AVX.
  */
 template <>
-inline
-void
+inline void
 vectorized_transpose_and_store(const bool                     add_into,
                                const unsigned int             n_entries,
                                const VectorizedArray<double> *in,
-                               const unsigned int            *offsets,
-                               double                        *out)
+                               const unsigned int *           offsets,
+                               double *                       out)
 {
-  const unsigned int n_chunks = n_entries/4;
-  double *out0 = out + offsets[0];
-  double *out1 = out + offsets[1];
-  double *out2 = out + offsets[2];
-  double *out3 = out + offsets[3];
-  for (unsigned int i=0; i<n_chunks; ++i)
+  const unsigned int n_chunks = n_entries / 4;
+  double *           out0     = out + offsets[0];
+  double *           out1     = out + offsets[1];
+  double *           out2     = out + offsets[2];
+  double *           out3     = out + offsets[3];
+  for (unsigned int i = 0; i < n_chunks; ++i)
     {
-      __m256d u0 = in[4*i+0].data;
-      __m256d u1 = in[4*i+1].data;
-      __m256d u2 = in[4*i+2].data;
-      __m256d u3 = in[4*i+3].data;
-      __m256d t0 = _mm256_permute2f128_pd (u0, u2, 0x20);
-      __m256d t1 = _mm256_permute2f128_pd (u1, u3, 0x20);
-      __m256d t2 = _mm256_permute2f128_pd (u0, u2, 0x31);
-      __m256d t3 = _mm256_permute2f128_pd (u1, u3, 0x31);
-      __m256d res0 = _mm256_unpacklo_pd (t0, t1);
-      __m256d res1 = _mm256_unpackhi_pd (t0, t1);
-      __m256d res2 = _mm256_unpacklo_pd (t2, t3);
-      __m256d res3 = _mm256_unpackhi_pd (t2, t3);
+      __m256d u0   = in[4 * i + 0].data;
+      __m256d u1   = in[4 * i + 1].data;
+      __m256d u2   = in[4 * i + 2].data;
+      __m256d u3   = in[4 * i + 3].data;
+      __m256d t0   = _mm256_permute2f128_pd(u0, u2, 0x20);
+      __m256d t1   = _mm256_permute2f128_pd(u1, u3, 0x20);
+      __m256d t2   = _mm256_permute2f128_pd(u0, u2, 0x31);
+      __m256d t3   = _mm256_permute2f128_pd(u1, u3, 0x31);
+      __m256d res0 = _mm256_unpacklo_pd(t0, t1);
+      __m256d res1 = _mm256_unpackhi_pd(t0, t1);
+      __m256d res2 = _mm256_unpacklo_pd(t2, t3);
+      __m256d res3 = _mm256_unpackhi_pd(t2, t3);
 
       // Cannot use the same store instructions in both paths of the 'if'
       // because the compiler cannot know that there is no aliasing between
       // pointers
       if (add_into)
         {
-          res0 = _mm256_add_pd(_mm256_loadu_pd(out0+4*i), res0);
-          _mm256_storeu_pd(out0+4*i, res0);
-          res1 = _mm256_add_pd(_mm256_loadu_pd(out1+4*i), res1);
-          _mm256_storeu_pd(out1+4*i, res1);
-          res2 = _mm256_add_pd(_mm256_loadu_pd(out2+4*i), res2);
-          _mm256_storeu_pd(out2+4*i, res2);
-          res3 = _mm256_add_pd(_mm256_loadu_pd(out3+4*i), res3);
-          _mm256_storeu_pd(out3+4*i, res3);
+          res0 = _mm256_add_pd(_mm256_loadu_pd(out0 + 4 * i), res0);
+          _mm256_storeu_pd(out0 + 4 * i, res0);
+          res1 = _mm256_add_pd(_mm256_loadu_pd(out1 + 4 * i), res1);
+          _mm256_storeu_pd(out1 + 4 * i, res1);
+          res2 = _mm256_add_pd(_mm256_loadu_pd(out2 + 4 * i), res2);
+          _mm256_storeu_pd(out2 + 4 * i, res2);
+          res3 = _mm256_add_pd(_mm256_loadu_pd(out3 + 4 * i), res3);
+          _mm256_storeu_pd(out3 + 4 * i, res3);
         }
       else
         {
-          _mm256_storeu_pd(out0+4*i, res0);
-          _mm256_storeu_pd(out1+4*i, res1);
-          _mm256_storeu_pd(out2+4*i, res2);
-          _mm256_storeu_pd(out3+4*i, res3);
+          _mm256_storeu_pd(out0 + 4 * i, res0);
+          _mm256_storeu_pd(out1 + 4 * i, res1);
+          _mm256_storeu_pd(out2 + 4 * i, res2);
+          _mm256_storeu_pd(out3 + 4 * i, res3);
         }
     }
   if (add_into)
-    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-      for (unsigned int v=0; v<4; ++v)
-        out[offsets[v]+i] += in[i][v];
+    for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+      for (unsigned int v = 0; v < 4; ++v)
+        out[offsets[v] + i] += in[i][v];
   else
-    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-      for (unsigned int v=0; v<4; ++v)
-        out[offsets[v]+i] = in[i][v];
+    for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+      for (unsigned int v = 0; v < 4; ++v)
+        out[offsets[v] + i] = in[i][v];
 }
 
 
 /**
  * Specialization for float and AVX.
  */
-template<>
+template <>
 class VectorizedArray<float>
 {
 public:
@@ -1141,7 +1175,7 @@ public:
    * This function can be used to set all data fields to a given scalar.
    */
   VectorizedArray &
-  operator = (const float x)
+  operator=(const float x)
   {
     data = _mm256_set1_ps(x);
     return *this;
@@ -1150,32 +1184,30 @@ public:
   /**
    * Access operator.
    */
-  float &
-  operator [] (const unsigned int comp)
+  float &operator[](const unsigned int comp)
   {
-    return *(reinterpret_cast<float *>(&data)+comp);
+    return *(reinterpret_cast<float *>(&data) + comp);
   }
 
   /**
    * Constant access operator.
    */
-  const float &
-  operator [] (const unsigned int comp) const
+  const float &operator[](const unsigned int comp) const
   {
-    return *(reinterpret_cast<const float *>(&data)+comp);
+    return *(reinterpret_cast<const float *>(&data) + comp);
   }
 
   /**
    * Addition.
    */
   VectorizedArray &
-  operator += (const VectorizedArray &vec)
+  operator+=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data += vec.data;
-#else
-    data = _mm256_add_ps(data,vec.data);
-#endif
+#  else
+    data = _mm256_add_ps(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -1183,24 +1215,24 @@ public:
    * Subtraction.
    */
   VectorizedArray &
-  operator -= (const VectorizedArray &vec)
+  operator-=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data -= vec.data;
-#else
-    data = _mm256_sub_ps(data,vec.data);
-#endif
+#  else
+    data = _mm256_sub_ps(data, vec.data);
+#  endif
     return *this;
   }
 
   VectorizedArray &
-  operator *= (const VectorizedArray &vec)
+  operator*=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data *= vec.data;
-#else
-    data = _mm256_mul_ps(data,vec.data);
-#endif
+#  else
+    data = _mm256_mul_ps(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -1208,55 +1240,59 @@ public:
    * Division.
    */
   VectorizedArray &
-  operator /= (const VectorizedArray &vec)
+  operator/=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data /= vec.data;
-#else
-    data = _mm256_div_ps(data,vec.data);
-#endif
+#  else
+    data = _mm256_div_ps(data, vec.data);
+#  endif
     return *this;
   }
 
-  void load (const float *ptr)
+  void
+  load(const float *ptr)
   {
-    data = _mm256_loadu_ps (ptr);
+    data = _mm256_loadu_ps(ptr);
   }
 
-  void store (float *ptr) const
+  void
+  store(float *ptr) const
   {
-    _mm256_storeu_ps (ptr, data);
+    _mm256_storeu_ps(ptr, data);
   }
 
-  void streaming_store (float *ptr) const
+  void
+  streaming_store(float *ptr) const
   {
-    _mm256_stream_ps(ptr,data);
+    _mm256_stream_ps(ptr, data);
   }
 
-  void gather (const float        *base_ptr,
-               const unsigned int *offsets)
+  void
+  gather(const float *base_ptr, const unsigned int *offsets)
   {
-#if __AVX2__
-    const __m256 index_val = _mm256_loadu_ps((const float *)offsets);
-    const __m256i index = *((__m256i *)(&index_val));
-    data = _mm256_i32gather_ps(base_ptr, index, 4);
-#else
-    for (unsigned int i=0; i<8; ++i)
-      *(reinterpret_cast<float *>(&data)+i) = base_ptr[offsets[i]];
-#endif
+#  if __AVX2__
+    const __m256  index_val = _mm256_loadu_ps((const float *)offsets);
+    const __m256i index     = *((__m256i *)(&index_val));
+    data                    = _mm256_i32gather_ps(base_ptr, index, 4);
+#  else
+    for (unsigned int i = 0; i < 8; ++i)
+      *(reinterpret_cast<float *>(&data) + i) = base_ptr[offsets[i]];
+#  endif
   }
 
-  void scatter (const unsigned int *offsets,
-                float              *base_ptr) const
+  void
+  scatter(const unsigned int *offsets, float *base_ptr) const
   {
     // no scatter operation in AVX/AVX2
-    for (unsigned int i=0; i<8; ++i)
-      base_ptr[offsets[i]] = *(reinterpret_cast<const float *>(&data)+i);
+    for (unsigned int i = 0; i < 8; ++i)
+      base_ptr[offsets[i]] = *(reinterpret_cast<const float *>(&data) + i);
   }
 
-  VectorizedArray get_abs () const
+  VectorizedArray
+  get_abs() const
   {
-    __m256 mask = _mm256_set1_ps (-0.f);
+    __m256          mask = _mm256_set1_ps(-0.f);
     VectorizedArray res;
     res.data = _mm256_andnot_ps(mask, data);
     return res;
@@ -1266,47 +1302,46 @@ public:
 };
 
 template <>
-inline
-void
+inline void
 vectorized_load_and_transpose(const unsigned int      n_entries,
-                              const float            *in,
-                              const unsigned int     *offsets,
+                              const float *           in,
+                              const unsigned int *    offsets,
                               VectorizedArray<float> *out)
 {
-  const unsigned int n_chunks = n_entries/4;
-  for (unsigned int i=0; i<n_chunks; ++i)
+  const unsigned int n_chunks = n_entries / 4;
+  for (unsigned int i = 0; i < n_chunks; ++i)
     {
-      __m128 u0 = _mm_loadu_ps(in+4*i+offsets[0]);
-      __m128 u1 = _mm_loadu_ps(in+4*i+offsets[1]);
-      __m128 u2 = _mm_loadu_ps(in+4*i+offsets[2]);
-      __m128 u3 = _mm_loadu_ps(in+4*i+offsets[3]);
-      __m128 u4 = _mm_loadu_ps(in+4*i+offsets[4]);
-      __m128 u5 = _mm_loadu_ps(in+4*i+offsets[5]);
-      __m128 u6 = _mm_loadu_ps(in+4*i+offsets[6]);
-      __m128 u7 = _mm_loadu_ps(in+4*i+offsets[7]);
+      __m128 u0 = _mm_loadu_ps(in + 4 * i + offsets[0]);
+      __m128 u1 = _mm_loadu_ps(in + 4 * i + offsets[1]);
+      __m128 u2 = _mm_loadu_ps(in + 4 * i + offsets[2]);
+      __m128 u3 = _mm_loadu_ps(in + 4 * i + offsets[3]);
+      __m128 u4 = _mm_loadu_ps(in + 4 * i + offsets[4]);
+      __m128 u5 = _mm_loadu_ps(in + 4 * i + offsets[5]);
+      __m128 u6 = _mm_loadu_ps(in + 4 * i + offsets[6]);
+      __m128 u7 = _mm_loadu_ps(in + 4 * i + offsets[7]);
       // To avoid warnings about uninitialized variables, need to initialize
       // one variable with zero before using it.
       __m256 t0, t1, t2, t3 = _mm256_set1_ps(0.F);
-      t0 = _mm256_insertf128_ps (t3, u0, 0);
-      t0 = _mm256_insertf128_ps (t0, u4, 1);
-      t1 = _mm256_insertf128_ps (t3, u1, 0);
-      t1 = _mm256_insertf128_ps (t1, u5, 1);
-      t2 = _mm256_insertf128_ps (t3, u2, 0);
-      t2 = _mm256_insertf128_ps (t2, u6, 1);
-      t3 = _mm256_insertf128_ps (t3, u3, 0);
-      t3 = _mm256_insertf128_ps (t3, u7, 1);
-      __m256 v0 = _mm256_shuffle_ps (t0, t1, 0x44);
-      __m256 v1 = _mm256_shuffle_ps (t0, t1, 0xee);
-      __m256 v2 = _mm256_shuffle_ps (t2, t3, 0x44);
-      __m256 v3 = _mm256_shuffle_ps (t2, t3, 0xee);
-      out[4*i+0].data = _mm256_shuffle_ps (v0, v2, 0x88);
-      out[4*i+1].data = _mm256_shuffle_ps (v0, v2, 0xdd);
-      out[4*i+2].data = _mm256_shuffle_ps (v1, v3, 0x88);
-      out[4*i+3].data = _mm256_shuffle_ps (v1, v3, 0xdd);
+      t0                  = _mm256_insertf128_ps(t3, u0, 0);
+      t0                  = _mm256_insertf128_ps(t0, u4, 1);
+      t1                  = _mm256_insertf128_ps(t3, u1, 0);
+      t1                  = _mm256_insertf128_ps(t1, u5, 1);
+      t2                  = _mm256_insertf128_ps(t3, u2, 0);
+      t2                  = _mm256_insertf128_ps(t2, u6, 1);
+      t3                  = _mm256_insertf128_ps(t3, u3, 0);
+      t3                  = _mm256_insertf128_ps(t3, u7, 1);
+      __m256 v0           = _mm256_shuffle_ps(t0, t1, 0x44);
+      __m256 v1           = _mm256_shuffle_ps(t0, t1, 0xee);
+      __m256 v2           = _mm256_shuffle_ps(t2, t3, 0x44);
+      __m256 v3           = _mm256_shuffle_ps(t2, t3, 0xee);
+      out[4 * i + 0].data = _mm256_shuffle_ps(v0, v2, 0x88);
+      out[4 * i + 1].data = _mm256_shuffle_ps(v0, v2, 0xdd);
+      out[4 * i + 2].data = _mm256_shuffle_ps(v1, v3, 0x88);
+      out[4 * i + 3].data = _mm256_shuffle_ps(v1, v3, 0xdd);
     }
-  for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-    for (unsigned int v=0; v<8; ++v)
-      out[i][v] = in[offsets[v]+i];
+  for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+    for (unsigned int v = 0; v < 8; ++v)
+      out[i][v] = in[offsets[v] + i];
 }
 
 
@@ -1315,80 +1350,79 @@ vectorized_load_and_transpose(const unsigned int      n_entries,
  * Specialization for float and AVX.
  */
 template <>
-inline
-void
+inline void
 vectorized_transpose_and_store(const bool                    add_into,
                                const unsigned int            n_entries,
                                const VectorizedArray<float> *in,
-                               const unsigned int           *offsets,
-                               float                        *out)
+                               const unsigned int *          offsets,
+                               float *                       out)
 {
-  const unsigned int n_chunks = n_entries/4;
-  for (unsigned int i=0; i<n_chunks; ++i)
+  const unsigned int n_chunks = n_entries / 4;
+  for (unsigned int i = 0; i < n_chunks; ++i)
     {
-      __m256 u0 = in[4*i+0].data;
-      __m256 u1 = in[4*i+1].data;
-      __m256 u2 = in[4*i+2].data;
-      __m256 u3 = in[4*i+3].data;
-      __m256 t0 = _mm256_shuffle_ps (u0, u1, 0x44);
-      __m256 t1 = _mm256_shuffle_ps (u0, u1, 0xee);
-      __m256 t2 = _mm256_shuffle_ps (u2, u3, 0x44);
-      __m256 t3 = _mm256_shuffle_ps (u2, u3, 0xee);
-      u0 = _mm256_shuffle_ps (t0, t2, 0x88);
-      u1 = _mm256_shuffle_ps (t0, t2, 0xdd);
-      u2 = _mm256_shuffle_ps (t1, t3, 0x88);
-      u3 = _mm256_shuffle_ps (t1, t3, 0xdd);
-      __m128 res0 = _mm256_extractf128_ps (u0, 0);
-      __m128 res4 = _mm256_extractf128_ps (u0, 1);
-      __m128 res1 = _mm256_extractf128_ps (u1, 0);
-      __m128 res5 = _mm256_extractf128_ps (u1, 1);
-      __m128 res2 = _mm256_extractf128_ps (u2, 0);
-      __m128 res6 = _mm256_extractf128_ps (u2, 1);
-      __m128 res3 = _mm256_extractf128_ps (u3, 0);
-      __m128 res7 = _mm256_extractf128_ps (u3, 1);
+      __m256 u0   = in[4 * i + 0].data;
+      __m256 u1   = in[4 * i + 1].data;
+      __m256 u2   = in[4 * i + 2].data;
+      __m256 u3   = in[4 * i + 3].data;
+      __m256 t0   = _mm256_shuffle_ps(u0, u1, 0x44);
+      __m256 t1   = _mm256_shuffle_ps(u0, u1, 0xee);
+      __m256 t2   = _mm256_shuffle_ps(u2, u3, 0x44);
+      __m256 t3   = _mm256_shuffle_ps(u2, u3, 0xee);
+      u0          = _mm256_shuffle_ps(t0, t2, 0x88);
+      u1          = _mm256_shuffle_ps(t0, t2, 0xdd);
+      u2          = _mm256_shuffle_ps(t1, t3, 0x88);
+      u3          = _mm256_shuffle_ps(t1, t3, 0xdd);
+      __m128 res0 = _mm256_extractf128_ps(u0, 0);
+      __m128 res4 = _mm256_extractf128_ps(u0, 1);
+      __m128 res1 = _mm256_extractf128_ps(u1, 0);
+      __m128 res5 = _mm256_extractf128_ps(u1, 1);
+      __m128 res2 = _mm256_extractf128_ps(u2, 0);
+      __m128 res6 = _mm256_extractf128_ps(u2, 1);
+      __m128 res3 = _mm256_extractf128_ps(u3, 0);
+      __m128 res7 = _mm256_extractf128_ps(u3, 1);
 
       // Cannot use the same store instructions in both paths of the 'if'
       // because the compiler cannot know that there is no aliasing between
       // pointers
       if (add_into)
         {
-          res0 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[0]), res0);
-          _mm_storeu_ps(out+4*i+offsets[0], res0);
-          res1 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[1]), res1);
-          _mm_storeu_ps(out+4*i+offsets[1], res1);
-          res2 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[2]), res2);
-          _mm_storeu_ps(out+4*i+offsets[2], res2);
-          res3 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[3]), res3);
-          _mm_storeu_ps(out+4*i+offsets[3], res3);
-          res4 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[4]), res4);
-          _mm_storeu_ps(out+4*i+offsets[4], res4);
-          res5 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[5]), res5);
-          _mm_storeu_ps(out+4*i+offsets[5], res5);
-          res6 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[6]), res6);
-          _mm_storeu_ps(out+4*i+offsets[6], res6);
-          res7 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[7]), res7);
-          _mm_storeu_ps(out+4*i+offsets[7], res7);
+          res0 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[0]), res0);
+          _mm_storeu_ps(out + 4 * i + offsets[0], res0);
+          res1 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[1]), res1);
+          _mm_storeu_ps(out + 4 * i + offsets[1], res1);
+          res2 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[2]), res2);
+          _mm_storeu_ps(out + 4 * i + offsets[2], res2);
+          res3 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[3]), res3);
+          _mm_storeu_ps(out + 4 * i + offsets[3], res3);
+          res4 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[4]), res4);
+          _mm_storeu_ps(out + 4 * i + offsets[4], res4);
+          res5 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[5]), res5);
+          _mm_storeu_ps(out + 4 * i + offsets[5], res5);
+          res6 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[6]), res6);
+          _mm_storeu_ps(out + 4 * i + offsets[6], res6);
+          res7 = _mm_add_ps(_mm_loadu_ps(out + 4 * i + offsets[7]), res7);
+          _mm_storeu_ps(out + 4 * i + offsets[7], res7);
         }
       else
         {
-          _mm_storeu_ps(out+4*i+offsets[0], res0);
-          _mm_storeu_ps(out+4*i+offsets[1], res1);
-          _mm_storeu_ps(out+4*i+offsets[2], res2);
-          _mm_storeu_ps(out+4*i+offsets[3], res3);
-          _mm_storeu_ps(out+4*i+offsets[4], res4);
-          _mm_storeu_ps(out+4*i+offsets[5], res5);
-          _mm_storeu_ps(out+4*i+offsets[6], res6);
-          _mm_storeu_ps(out+4*i+offsets[7], res7);
+          _mm_storeu_ps(out + 4 * i + offsets[0], res0);
+          _mm_storeu_ps(out + 4 * i + offsets[1], res1);
+          _mm_storeu_ps(out + 4 * i + offsets[2], res2);
+          _mm_storeu_ps(out + 4 * i + offsets[3], res3);
+          _mm_storeu_ps(out + 4 * i + offsets[4], res4);
+          _mm_storeu_ps(out + 4 * i + offsets[5], res5);
+          _mm_storeu_ps(out + 4 * i + offsets[6], res6);
+          _mm_storeu_ps(out + 4 * i + offsets[7], res7);
         }
     }
   if (add_into)
-    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-      for (unsigned int v=0; v<8; ++v)
-        out[offsets[v]+i] += in[i][v];
+    for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+      for (unsigned int v = 0; v < 8; ++v)
+        out[offsets[v] + i] += in[i][v];
   else
-    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
-      for (unsigned int v=0; v<8; ++v)
-        out[offsets[v]+i] = in[i][v];
+    for (unsigned int i = 4 * n_chunks; i < n_entries; ++i)
+      for (unsigned int v = 0; v < 8; ++v)
+        out[offsets[v] + i] = in[i][v];
 }
 
 
@@ -1410,7 +1444,7 @@ public:
    * This function can be used to set all data fields to a given scalar.
    */
   VectorizedArray &
-  operator = (const double x)
+  operator=(const double x)
   {
     data = _mm_set1_pd(x);
     return *this;
@@ -1419,32 +1453,30 @@ public:
   /**
    * Access operator.
    */
-  double &
-  operator [] (const unsigned int comp)
+  double &operator[](const unsigned int comp)
   {
-    return *(reinterpret_cast<double *>(&data)+comp);
+    return *(reinterpret_cast<double *>(&data) + comp);
   }
 
   /**
    * Constant access operator.
    */
-  const double &
-  operator [] (const unsigned int comp) const
+  const double &operator[](const unsigned int comp) const
   {
-    return *(reinterpret_cast<const double *>(&data)+comp);
+    return *(reinterpret_cast<const double *>(&data) + comp);
   }
 
   /**
    * Addition.
    */
   VectorizedArray &
-  operator += (const VectorizedArray &vec)
+  operator+=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data += vec.data;
-#else
-    data = _mm_add_pd(data,vec.data);
-#endif
+#  else
+    data = _mm_add_pd(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -1452,13 +1484,13 @@ public:
    * Subtraction.
    */
   VectorizedArray &
-  operator -= (const VectorizedArray &vec)
+  operator-=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data -= vec.data;
-#else
-    data = _mm_sub_pd(data,vec.data);
-#endif
+#  else
+    data = _mm_sub_pd(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -1466,13 +1498,13 @@ public:
    * Multiplication.
    */
   VectorizedArray &
-  operator *= (const VectorizedArray &vec)
+  operator*=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data *= vec.data;
-#else
-    data = _mm_mul_pd(data,vec.data);
-#endif
+#  else
+    data = _mm_mul_pd(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -1480,48 +1512,52 @@ public:
    * Division.
    */
   VectorizedArray &
-  operator /= (const VectorizedArray &vec)
+  operator/=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data /= vec.data;
-#else
-    data = _mm_div_pd(data,vec.data);
-#endif
+#  else
+    data = _mm_div_pd(data, vec.data);
+#  endif
     return *this;
   }
 
-  void load (const double *ptr)
+  void
+  load(const double *ptr)
   {
-    data = _mm_loadu_pd (ptr);
+    data = _mm_loadu_pd(ptr);
   }
 
-  void store (double *ptr) const
+  void
+  store(double *ptr) const
   {
-    _mm_storeu_pd (ptr, data);
+    _mm_storeu_pd(ptr, data);
   }
 
-  void streaming_store (double *ptr) const
+  void
+  streaming_store(double *ptr) const
   {
-    _mm_stream_pd(ptr,data);
+    _mm_stream_pd(ptr, data);
   }
 
-  void gather (const double       *base_ptr,
-               const unsigned int *offsets)
+  void
+  gather(const double *base_ptr, const unsigned int *offsets)
   {
-    for (unsigned int i=0; i<2; ++i)
-      *(reinterpret_cast<double *>(&data)+i) = base_ptr[offsets[i]];
+    for (unsigned int i = 0; i < 2; ++i)
+      *(reinterpret_cast<double *>(&data) + i) = base_ptr[offsets[i]];
   }
 
-  void scatter (const unsigned int *offsets,
-                double             *base_ptr) const
+  void
+  scatter(const unsigned int *offsets, double *base_ptr) const
   {
-    for (unsigned int i=0; i<2; ++i)
-      base_ptr[offsets[i]] = *(reinterpret_cast<const double *>(&data)+i);
+    for (unsigned int i = 0; i < 2; ++i)
+      base_ptr[offsets[i]] = *(reinterpret_cast<const double *>(&data) + i);
   }
 
-  VectorizedArray get_abs () const
+  VectorizedArray
+  get_abs() const
   {
-    __m128d mask = _mm_set1_pd (-0.);
+    __m128d         mask = _mm_set1_pd(-0.);
     VectorizedArray res;
     res.data = _mm_andnot_pd(mask, data);
     return res;
@@ -1548,7 +1584,7 @@ public:
    * This function can be used to set all data fields to a given scalar.
    */
   VectorizedArray &
-  operator = (const float x)
+  operator=(const float x)
   {
     data = _mm_set1_ps(x);
     return *this;
@@ -1557,32 +1593,30 @@ public:
   /**
    * Access operator.
    */
-  float &
-  operator [] (const unsigned int comp)
+  float &operator[](const unsigned int comp)
   {
-    return *(reinterpret_cast<float *>(&data)+comp);
+    return *(reinterpret_cast<float *>(&data) + comp);
   }
 
   /**
    * Constant access operator.
    */
-  const float &
-  operator [] (const unsigned int comp) const
+  const float &operator[](const unsigned int comp) const
   {
-    return *(reinterpret_cast<const float *>(&data)+comp);
+    return *(reinterpret_cast<const float *>(&data) + comp);
   }
 
   /**
    * Addition.
    */
   VectorizedArray &
-  operator += (const VectorizedArray &vec)
+  operator+=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data += vec.data;
-#else
-    data = _mm_add_ps(data,vec.data);
-#endif
+#  else
+    data = _mm_add_ps(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -1590,13 +1624,13 @@ public:
    * Subtraction.
    */
   VectorizedArray &
-  operator -= (const VectorizedArray &vec)
+  operator-=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data -= vec.data;
-#else
-    data = _mm_sub_ps(data,vec.data);
-#endif
+#  else
+    data = _mm_sub_ps(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -1604,13 +1638,13 @@ public:
    * Multiplication.
    */
   VectorizedArray &
-  operator *= (const VectorizedArray &vec)
+  operator*=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data *= vec.data;
-#else
-    data = _mm_mul_ps(data,vec.data);
-#endif
+#  else
+    data = _mm_mul_ps(data, vec.data);
+#  endif
     return *this;
   }
 
@@ -1618,48 +1652,52 @@ public:
    * Division.
    */
   VectorizedArray &
-  operator /= (const VectorizedArray &vec)
+  operator/=(const VectorizedArray &vec)
   {
-#if USE_VECTOR_ARITHMETICS
+#  if USE_VECTOR_ARITHMETICS
     data /= vec.data;
-#else
-    data = _mm_div_ps(data,vec.data);
-#endif
+#  else
+    data = _mm_div_ps(data, vec.data);
+#  endif
     return *this;
   }
 
-  void load (const float *ptr)
+  void
+  load(const float *ptr)
   {
-    data = _mm_loadu_ps (ptr);
+    data = _mm_loadu_ps(ptr);
   }
 
-  void store (float *ptr) const
+  void
+  store(float *ptr) const
   {
-    _mm_storeu_ps (ptr, data);
+    _mm_storeu_ps(ptr, data);
   }
 
-  void streaming_store (float *ptr) const
+  void
+  streaming_store(float *ptr) const
   {
-    _mm_stream_ps(ptr,data);
+    _mm_stream_ps(ptr, data);
   }
 
-  void gather (const float        *base_ptr,
-               const unsigned int *offsets)
+  void
+  gather(const float *base_ptr, const unsigned int *offsets)
   {
-    for (unsigned int i=0; i<4; ++i)
-      *(reinterpret_cast<float *>(&data)+i) = base_ptr[offsets[i]];
+    for (unsigned int i = 0; i < 4; ++i)
+      *(reinterpret_cast<float *>(&data) + i) = base_ptr[offsets[i]];
   }
 
-  void scatter (const unsigned int *offsets,
-                float              *base_ptr) const
+  void
+  scatter(const unsigned int *offsets, float *base_ptr) const
   {
-    for (unsigned int i=0; i<4; ++i)
-      base_ptr[offsets[i]] = *(reinterpret_cast<const float *>(&data)+i);
+    for (unsigned int i = 0; i < 4; ++i)
+      base_ptr[offsets[i]] = *(reinterpret_cast<const float *>(&data) + i);
   }
 
-  VectorizedArray get_abs () const
+  VectorizedArray
+  get_abs() const
   {
-    __m128 mask = _mm_set1_ps (-0.f);
+    __m128          mask = _mm_set1_ps(-0.f);
     VectorizedArray res;
     res.data = _mm_andnot_ps(mask, data);
     return res;
@@ -1674,210 +1712,189 @@ public:
 
 template <typename Number>
 VectorizedArray<Number>
-operator + (const VectorizedArray<Number> &u,
-            const VectorizedArray<Number> &v)
+operator+(const VectorizedArray<Number> &u, const VectorizedArray<Number> &v)
 {
   VectorizedArray<Number> tmp = u;
-  return tmp+=v;
+  return tmp += v;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator - (const VectorizedArray<Number> &u,
-            const VectorizedArray<Number> &v)
+operator-(const VectorizedArray<Number> &u, const VectorizedArray<Number> &v)
 {
   VectorizedArray<Number> tmp = u;
-  return tmp-=v;
+  return tmp -= v;
+}
+
+template <typename Number>
+VectorizedArray<Number> operator*(const VectorizedArray<Number> &u,
+                                  const VectorizedArray<Number> &v)
+{
+  VectorizedArray<Number> tmp = u;
+  return tmp *= v;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator * (const VectorizedArray<Number> &u,
-            const VectorizedArray<Number> &v)
+operator/(const VectorizedArray<Number> &u, const VectorizedArray<Number> &v)
 {
   VectorizedArray<Number> tmp = u;
-  return tmp*=v;
+  return tmp /= v;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator / (const VectorizedArray<Number> &u,
-            const VectorizedArray<Number> &v)
-{
-  VectorizedArray<Number> tmp = u;
-  return tmp/=v;
-}
-
-template <typename Number>
-VectorizedArray<Number>
-operator + (const Number                  &u,
-            const VectorizedArray<Number> &v)
+operator+(const Number &u, const VectorizedArray<Number> &v)
 {
   VectorizedArray<Number> tmp;
   tmp = u;
-  return tmp+=v;
+  return tmp += v;
 }
 
 VectorizedArray<float>
-operator + (const double                 &u,
-            const VectorizedArray<float> &v)
+operator+(const double &u, const VectorizedArray<float> &v)
 {
   VectorizedArray<float> tmp;
   tmp = u;
-  return tmp+=v;
+  return tmp += v;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator + (const VectorizedArray<Number> &v,
-            const Number                  &u)
+operator+(const VectorizedArray<Number> &v, const Number &u)
 {
   return u + v;
 }
 
 VectorizedArray<float>
-operator + (const VectorizedArray<float> &v,
-            const double                 &u)
+operator+(const VectorizedArray<float> &v, const double &u)
 {
   return u + v;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator - (const Number                  &u,
-            const VectorizedArray<Number> &v)
+operator-(const Number &u, const VectorizedArray<Number> &v)
 {
   VectorizedArray<Number> tmp;
   tmp = u;
-  return tmp-=v;
+  return tmp -= v;
 }
 
 VectorizedArray<float>
-operator - (const double                 &u,
-            const VectorizedArray<float> &v)
+operator-(const double &u, const VectorizedArray<float> &v)
 {
   VectorizedArray<float> tmp;
   tmp = float(u);
-  return tmp-=v;
+  return tmp -= v;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator - (const VectorizedArray<Number> &v,
-            const Number                  &u)
+operator-(const VectorizedArray<Number> &v, const Number &u)
 {
   VectorizedArray<Number> tmp;
   tmp = u;
-  return v-tmp;
+  return v - tmp;
 }
 
 VectorizedArray<float>
-operator - (const VectorizedArray<float> &v,
-            const double                 &u)
+operator-(const VectorizedArray<float> &v, const double &u)
 {
   VectorizedArray<float> tmp;
   tmp = float(u);
-  return v-tmp;
+  return v - tmp;
 }
 
 template <typename Number>
-VectorizedArray<Number>
-operator * (const Number                  &u,
-            const VectorizedArray<Number> &v)
+VectorizedArray<Number> operator*(const Number &                 u,
+                                  const VectorizedArray<Number> &v)
 {
   VectorizedArray<Number> tmp;
   tmp = u;
-  return tmp*=v;
+  return tmp *= v;
 }
 
-VectorizedArray<float>
-operator * (const double                 &u,
-            const VectorizedArray<float> &v)
+VectorizedArray<float> operator*(const double &                u,
+                                 const VectorizedArray<float> &v)
 {
   VectorizedArray<float> tmp;
   tmp = float(u);
-  return tmp*=v;
+  return tmp *= v;
 }
 
 template <typename Number>
-VectorizedArray<Number>
-operator * (const VectorizedArray<Number> &v,
-            const Number                  &u)
+VectorizedArray<Number> operator*(const VectorizedArray<Number> &v,
+                                  const Number &                 u)
 {
   return u * v;
 }
 
-VectorizedArray<float>
-operator * (const VectorizedArray<float> &v,
-            const double                 &u)
+VectorizedArray<float> operator*(const VectorizedArray<float> &v,
+                                 const double &                u)
 {
   return u * v;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator / (const Number                  &u,
-            const VectorizedArray<Number> &v)
+operator/(const Number &u, const VectorizedArray<Number> &v)
 {
   VectorizedArray<Number> tmp;
   tmp = u;
-  return tmp/=v;
+  return tmp /= v;
 }
 
 VectorizedArray<float>
-operator / (const double                 &u,
-            const VectorizedArray<float> &v)
+operator/(const double &u, const VectorizedArray<float> &v)
 {
   VectorizedArray<float> tmp;
   tmp = float(u);
-  return tmp/=v;
+  return tmp /= v;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator / (const VectorizedArray<Number> &v,
-            const Number                  &u)
+operator/(const VectorizedArray<Number> &v, const Number &u)
 {
   VectorizedArray<Number> tmp;
   tmp = u;
-  return v/tmp;
+  return v / tmp;
 }
 
 VectorizedArray<float>
-operator / (const VectorizedArray<float> &v,
-            const double                 &u)
+operator/(const VectorizedArray<float> &v, const double &u)
 {
   VectorizedArray<float> tmp;
   tmp = float(u);
-  return v/tmp;
+  return v / tmp;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator + (const VectorizedArray<Number> &u)
+operator+(const VectorizedArray<Number> &u)
 {
   return u;
 }
 
 template <typename Number>
 VectorizedArray<Number>
-operator - (const VectorizedArray<Number> &u)
+operator-(const VectorizedArray<Number> &u)
 {
   // to get a negative sign, subtract the input from zero (could also
   // multiply by -1, but this one is slightly simpler)
-  return VectorizedArray<Number>()-u;
+  return VectorizedArray<Number>() - u;
 }
 
 
 namespace std
 {
   template <typename Number>
-  inline
-  VectorizedArray<Number>
-  abs (const VectorizedArray<Number> &x)
+  inline VectorizedArray<Number>
+  abs(const VectorizedArray<Number> &x)
   {
     return x.get_abs();
   }
-}
+} // namespace std
 
 #endif
