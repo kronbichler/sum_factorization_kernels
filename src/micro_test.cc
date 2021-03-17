@@ -152,6 +152,8 @@ test_low_level(const Number2 *__restrict matrix, const Number *input, Number *ou
           svfloat64_t c16 = svdup_n_f64(matrix[16]);
           svfloat64_t c17 = svdup_n_f64(matrix[17]);
 
+          svfloat64_t t2, t3, t4, t5;
+
           t0 = svmul_f64_z(svptrue_b64(), xp0, c00);
           t1 = svmul_f64_z(svptrue_b64(), xm0, c15);
           t2 = svmul_f64_z(svptrue_b64(), xp0, c01);
