@@ -51,6 +51,8 @@ target_link_libraries(test_dg_advect ${MPI_LIBRARIES})
 add_executable(test_program_vect src/test_program_vect.cc)
 target_link_libraries(test_program_vect ${MPI_LIBRARIES})
 
+add_executable(micro-test src/micro_test.cc)
+
 add_executable(test_gauss src/test_gauss.cc)
 add_executable(test_polynomial src/test_polynomial.cc)
 add_executable(test_multiplication src/test_multiplication.cc)
