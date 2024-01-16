@@ -19,6 +19,8 @@
 #include "matrix_vector_kernel.h"
 #include "vectorization.h"
 
+#include <array>
+
 //#define COPY_ONLY_BENCHMARK
 //#define DO_FACES
 //#define DO_MASS_MATRIX
