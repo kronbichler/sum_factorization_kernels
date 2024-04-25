@@ -14,4 +14,4 @@ year =
 ```
 
 Parts of the implementation have been taken from the deal.II finite element,
-github.com/dealii/dealii.
+https://github.com/dealii/dealii.
