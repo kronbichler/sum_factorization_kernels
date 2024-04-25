@@ -4,12 +4,15 @@ This small project collects basic sum factorization kernels for high
 performance execution on modern cache-based CPUs. This work has been partly
 used to run the basic kernel in the publication
 ```
-@misc{Kronbichler17b,
-author = "Kronbichler, Martin and Kormann, Katharina",
+@article{Kronbichler2019,
+author = "Kronbichler, M. and Kormann, K.", 
 title  = "Fast matrix-free evaluation of discontinuous {G}alerkin finite element operators",
-note = {arXiv:1711.03590 preprint},
-year =
-{2017}
+journal = {ACM Trans. Math. Softw.},
+volume = {45},
+number = {3},
+pages = {29:1--29:40},
+year = {2019},
+doi = {10.1145/3325864}
 }
 ```
 
